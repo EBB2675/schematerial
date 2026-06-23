@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -9,7 +7,7 @@ from schematerial.models.schema import SchemaModel
 
 @runtime_checkable
 class Parser(Protocol):
-    """Parses a materials schema format into the internal SchemaModel IR."""
+    """Converts a schema source file into the internal SchemaModel IR."""
 
     def parse(self, source: str | Path) -> SchemaModel:
         ...
@@ -17,7 +15,7 @@ class Parser(Protocol):
 
 @runtime_checkable
 class OntologyParser(Protocol):
-    """Parses an OWL/TTL ontology into the internal OntologyModel IR (Mode B)."""
+    """Converts an OWL/TTL ontology into the internal OntologyModel IR."""
 
     def parse(self, source: str | Path) -> OntologyModel:
         ...

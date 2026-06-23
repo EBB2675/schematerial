@@ -1,55 +1,47 @@
-# CIF (Crystallographic Information File) — hand-curated schema fixture
-# CIF is a flat key-value format using STAR syntax; paths are just the CIF tag names.
-# Units follow IUCr conventions: Angstroms for lengths, degrees for angles.
-# Source: https://www.iucr.org/resources/cif/dictionaries/cif_core
-#
-# Note: CIF is a structure format, not an electronic-structure format.
-# It carries no total energy or band gap. The energy fields in NOMAD/OPTIMADE/Emmet
-# have no direct CIF counterpart — this is an explicit non-mapping for calibration.
+# CIF core: flat key-value crystallographic format, Angstroms + degrees
+# No energy or band gap fields; structure-only format.
+# https://www.iucr.org/resources/cif/dictionaries/cif_core
 
 name: "CIF core"
 version: "2.0"
-description: >
-  Flat key-value crystallographic data. Used as a calibration pair with OPTIMADE
-  (the OPTIMADE spec documents CIF field mappings). Contains unit-cell and
-  atomic-position fields but no electronic-structure fields.
+description: "Flat key-value crystallographic data. No electronic-structure fields."
 
 fields:
   - name: cell_length_a
     path: _cell_length_a
     dtype: float
     unit: Angstrom
-    description: Length of the a cell edge in Angstroms.
+    description: a cell edge length.
 
   - name: cell_length_b
     path: _cell_length_b
     dtype: float
     unit: Angstrom
-    description: Length of the b cell edge in Angstroms.
+    description: b cell edge length.
 
   - name: cell_length_c
     path: _cell_length_c
     dtype: float
     unit: Angstrom
-    description: Length of the c cell edge in Angstroms.
+    description: c cell edge length.
 
   - name: cell_angle_alpha
     path: _cell_angle_alpha
     dtype: float
     unit: degree
-    description: Angle between b and c axes in degrees.
+    description: Angle between b and c axes.
 
   - name: cell_angle_beta
     path: _cell_angle_beta
     dtype: float
     unit: degree
-    description: Angle between a and c axes in degrees.
+    description: Angle between a and c axes.
 
   - name: cell_angle_gamma
     path: _cell_angle_gamma
     dtype: float
     unit: degree
-    description: Angle between a and b axes in degrees.
+    description: Angle between a and b axes.
 
   - name: chemical_formula_sum
     path: _chemical_formula_sum
@@ -61,16 +53,16 @@ fields:
     path: _atom_site_fract_x
     dtype: float[N]
     unit: null
-    description: Fractional coordinate x for each atom site.
+    description: Fractional x coordinate for each atom site.
 
   - name: atom_site_fract_y
     path: _atom_site_fract_y
     dtype: float[N]
     unit: null
-    description: Fractional coordinate y for each atom site.
+    description: Fractional y coordinate for each atom site.
 
   - name: atom_site_fract_z
     path: _atom_site_fract_z
     dtype: float[N]
     unit: null
-    description: Fractional coordinate z for each atom site.
+    description: Fractional z coordinate for each atom site.

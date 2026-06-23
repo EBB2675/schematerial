@@ -1,22 +1,8 @@
-# NOMAD Metainfo ↔ Emmet (Materials Project) ground truth
-#
-# role: discovery
-# No production crosswalk exists between these two schemas. Both describe
-# DFT calculations (primarily VASP) of crystalline materials, but the
-# structural choices diverge significantly:
-#   - NOMAD: deep section hierarchy, SI units, last-calculation indexing
-#   - Emmet: flat Pydantic JSON, eV + Å (pymatgen convention), calcs_reversed[0]
-#
-# This file is hand-written by domain expert review of both schema definitions.
-# It should be treated as the reference answer when evaluating Schematerial's
-# automated alignment on this pair.
-#
-# provenance:
-#   nomad:  https://nomad-lab.eu/prod/v1/staging/docs/reference/archive.html
-#   emmet:  https://github.com/materialsproject/emmet (TaskDocument schema)
-#   created: 2026-06-23
-#   method: hand-written; cross-checked against NOMAD metainfo definitions
-#           and emmet TaskDocument / CalcDoc Pydantic models
+# NOMAD Metainfo ↔ Emmet (Materials Project): discovery ground truth
+# Hand-written; no production crosswalk exists between these schemas.
+# Provenance:
+#   NOMAD: https://nomad-lab.eu/prod/v1/staging/docs/reference/archive.html
+#   Emmet: https://github.com/materialsproject/emmet (TaskDocument)
 
 metadata:
   role: discovery
@@ -26,8 +12,6 @@ metadata:
   created: "2026-06-23"
 
 mappings:
-
-  # --- Energy fields ---
 
   - source_field: energy_total
     source_path: run[0].calculation[-1].energy.total.value
@@ -40,10 +24,7 @@ mappings:
       from_unit: J
       to_unit: eV
       factor: 6.241509074e18
-    notes: >
-      Both are the DFT SCF total energy (VASP TOTEN). Confidence < 1.0 because
-      NOMAD calculation[-1] and Emmet calcs_reversed[0] both refer to the final
-      ionic step, but this must be verified per-entry for multi-step relaxations.
+    notes: "Both refer to the final ionic step, but verify for multi-step relaxations."
 
   - source_field: energy_total_per_atom
     source_path: run[0].calculation[-1].energy.total.value_per_atom
@@ -56,9 +37,7 @@ mappings:
       from_unit: J
       to_unit: eV
       factor: 6.241509074e18
-    notes: Same caveats as energy_total regarding final-step indexing.
-
-  # --- Structure counts and formula ---
+    notes: "Same indexing caveat as energy_total."
 
   - source_field: n_atoms
     source_path: run[0].system[-1].atoms.n_atoms
@@ -67,9 +46,7 @@ mappings:
     relation: exact
     confidence: 1.0
     transform: null
-    notes: >
-      Direct integer equality. Note that Emmet nsites is a top-level field on
-      TaskDocument, not nested under calcs_reversed.
+    notes: "Emmet nsites is top-level on TaskDocument, not nested under calcs_reversed."
 
   - source_field: chemical_composition_reduced
     source_path: run[0].system[-1].chemical_composition_reduced
@@ -78,15 +55,7 @@ mappings:
     relation: close
     confidence: 0.85
     transform: null
-    notes: >
-      Both are reduced formulas but with different element ordering conventions.
-      NOMAD uses Hill order (C, H, then alphabetical). Emmet formula_pretty uses
-      pymatgen's electronegativity-based ordering. For single-element systems
-      (Si, Fe) these are identical. For binary+ systems they will differ:
-      e.g. NOMAD "GaAs" vs Emmet "AsGa" or vice versa depending on
-      electronegativity ordering. Treat as CLOSE, not EXACT.
-
-  # --- Lattice and positions ---
+    notes: "NOMAD: Hill order. Emmet: pymatgen electronegativity order. Identical for single-element systems; diverges for binary+."
 
   - source_field: lattice_vectors
     source_path: run[0].system[-1].atoms.lattice_vectors
@@ -99,10 +68,7 @@ mappings:
       from_unit: m
       to_unit: Angstrom
       factor: 1.0e10
-    notes: >
-      Both are 3×3 matrices with rows as lattice vectors (a, b, c). Emmet
-      lattice.matrix follows pymatgen convention which matches NOMAD's row order.
-      Unit conversion only.
+    notes: "Same row convention. Unit conversion only."
 
   - source_field: atom_positions
     source_path: run[0].system[-1].atoms.positions
@@ -115,10 +81,7 @@ mappings:
       from_unit: m
       to_unit: Angstrom
       factor: 1.0e10
-    notes: >
-      Both are Cartesian coordinates in the same frame. Emmet also exposes
-      fractional coordinates (sites[].abc) — prefer xyz for an exact mapping.
-      The [] notation indicates per-site array indexing.
+    notes: "Prefer xyz over sites[].abc. [] indicates per-site array indexing."
 
   - source_field: atom_labels
     source_path: run[0].system[-1].atoms.labels
@@ -127,11 +90,7 @@ mappings:
     relation: exact
     confidence: 0.9
     transform: null
-    notes: >
-      Both are per-site element symbol strings. Emmet stores these as site.label
-      which for elemental sites equals the element symbol.
-
-  # --- Band gap ---
+    notes: "For elemental sites, site.label equals the element symbol."
 
   - source_field: band_gap
     source_path: run[0].calculation[-1].band_gap[0].value
@@ -144,9 +103,4 @@ mappings:
       from_unit: J
       to_unit: eV
       factor: 6.241509074e18
-    notes: >
-      NOMAD band_gap[0] is spin-averaged or total gap. Emmet output.bandgap is
-      the minimum gap across spin channels. These are equivalent for
-      non-spin-polarised calculations. For spin-polarised systems, verify
-      whether NOMAD band_gap[0] or band_gap[1] is the correct counterpart.
-      Confidence reflects this ambiguity.
+    notes: "Emmet output.bandgap is the minimum gap across spin channels; NOMAD band_gap[0] is spin-averaged. Equivalent for non-spin-polarised calculations."

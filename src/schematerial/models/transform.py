@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pydantic import BaseModel
 
 
@@ -13,7 +11,6 @@ class UnitConversionOp(TransformOp):
 
 
 class PerAtomRescaleOp(TransformOp):
-    # "to_per_atom" or "to_total" — use Literal in Phase 1
     direction: str
 
 

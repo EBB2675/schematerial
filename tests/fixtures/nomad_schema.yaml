@@ -1,50 +1,46 @@
-# NOMAD Metainfo — hand-curated schema fixture
-# Units: SI throughout (J, m). This is one of the primary alignment challenges
-# with OPTIMADE and Emmet, which use eV and Angstroms.
-# Source: https://nomad-lab.eu/prod/v1/staging/docs/reference/archive.html
+# NOMAD Metainfo: DFT calculation results, SI units throughout
+# https://nomad-lab.eu/prod/v1/staging/docs/reference/archive.html
 
 name: "NOMAD Metainfo"
 version: "1.0"
-description: >
-  NOMAD's internal section hierarchy for DFT calculation results.
-  Paths use Python-style indexing (run[0], calculation[-1]).
+description: "Section hierarchy for DFT results. Paths use Python-style indexing (run[0], calculation[-1])."
 
 fields:
   - name: energy_total
     path: run[0].calculation[-1].energy.total.value
     dtype: float
     unit: J
-    description: Total electronic energy of the system (DFT SCF converged)
+    description: Total electronic energy (DFT SCF converged).
 
   - name: energy_total_per_atom
     path: run[0].calculation[-1].energy.total.value_per_atom
     dtype: float
     unit: J
-    description: Total energy divided by number of atoms
+    description: Total energy divided by number of atoms.
 
   - name: n_atoms
     path: run[0].system[-1].atoms.n_atoms
     dtype: int
     unit: null
-    description: Number of atoms in the simulation cell
+    description: Number of atoms in the simulation cell.
 
   - name: chemical_composition_reduced
     path: run[0].system[-1].chemical_composition_reduced
     dtype: str
     unit: null
-    description: Reduced chemical formula (e.g. "Si", "GaAs")
+    description: Reduced chemical formula in Hill order (e.g. "GaAs").
 
   - name: lattice_vectors
     path: run[0].system[-1].atoms.lattice_vectors
     dtype: float[3][3]
     unit: m
-    description: Bravais lattice vectors as a 3x3 matrix in metres
+    description: Bravais lattice vectors as a 3×3 matrix.
 
   - name: atom_positions
     path: run[0].system[-1].atoms.positions
     dtype: float[N][3]
     unit: m
-    description: Cartesian positions of each atom in metres
+    description: Cartesian positions of each atom.
 
   - name: band_gap
     path: run[0].calculation[-1].band_gap[0].value

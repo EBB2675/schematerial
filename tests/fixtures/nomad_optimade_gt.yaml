@@ -1,20 +1,8 @@
-# NOMAD Metainfo ↔ OPTIMADE ground truth
-#
-# role: calibration
-# NOMAD is an OPTIMADE provider. This mapping is implemented in production
-# in the NOMAD codebase (nomad-lab package, optimade module). Use this file
-# to verify that Schematerial reproduces the known-good alignment — do NOT
-# use it as evidence that the tool solves a discovery problem.
-#
-# provenance:
-#   primary:  NOMAD OPTIMADE adapter (nomad/app/v1/routers/optimade.py and
-#             nomad/normalizing/optimade.py in the nomad-lab GitLab repo)
-#   spec:     https://github.com/Materials-Consortia/OPTIMADE (v1.2)
-#   notes:    Standard OPTIMADE has no mandatory energy field. NOMAD exposes
-#             energies and band gap as provider-specific extensions prefixed
-#             with _nomad_. Energy and length unit conversions are the primary
-#             transform challenge; the conversion factors are exact by definition
-#             (1 eV = 1.602176634e-19 J, 1 Å = 1e-10 m).
+# NOMAD Metainfo ↔ OPTIMADE: calibration ground truth
+# NOMAD is an OPTIMADE provider; this mapping exists as production adapter code.
+# Use for scoring calibration only; not a discovery case.
+# Adapter: nomad/app/v1/routers/optimade.py, nomad/normalizing/optimade.py
+# Spec: https://github.com/Materials-Consortia/OPTIMADE (v1.2)
 
 metadata:
   role: calibration
@@ -24,8 +12,6 @@ metadata:
   created: "2026-06-23"
 
 mappings:
-
-  # --- Energy fields ---
 
   - source_field: energy_total
     source_path: run[0].calculation[-1].energy.total.value
@@ -38,10 +24,7 @@ mappings:
       from_unit: J
       to_unit: eV
       factor: 6.241509074e18
-    notes: >
-      NOMAD stores DFT total energy in SI (Joules). OPTIMADE exposes it as a
-      provider-specific extension in eV. The quantity is the same: DFT SCF
-      total energy.
+    notes: "DFT SCF total energy; unit conversion only."
 
   - source_field: energy_total_per_atom
     source_path: run[0].calculation[-1].energy.total.value_per_atom
@@ -54,11 +37,7 @@ mappings:
       from_unit: J
       to_unit: eV
       factor: 6.241509074e18
-    notes: >
-      Derived field in both schemas (total / n_atoms). The transform is the
-      same unit conversion as energy_total.
-
-  # --- Structure fields ---
+    notes: "Same transform as energy_total; total / n_atoms in both schemas."
 
   - source_field: n_atoms
     source_path: run[0].system[-1].atoms.n_atoms
@@ -67,7 +46,7 @@ mappings:
     relation: exact
     confidence: 1.0
     transform: null
-    notes: Direct integer equality. OPTIMADE nsites is mandatory.
+    notes: "Direct integer equality."
 
   - source_field: chemical_composition_reduced
     source_path: run[0].system[-1].chemical_composition_reduced
@@ -76,11 +55,7 @@ mappings:
     relation: close
     confidence: 0.95
     transform: null
-    notes: >
-      Both are reduced formulas, but element ordering may differ. OPTIMADE
-      requires alphabetical ordering (e.g. "AsGa"); NOMAD follows Hill
-      convention (C first, then H, then alphabetical). For single-element
-      systems these are identical.
+    notes: "OPTIMADE requires alphabetical ordering; NOMAD uses Hill convention. Identical for single-element systems."
 
   - source_field: lattice_vectors
     source_path: run[0].system[-1].atoms.lattice_vectors
@@ -93,7 +68,7 @@ mappings:
       from_unit: m
       to_unit: Angstrom
       factor: 1.0e10
-    notes: Both are 3×3 matrices. Row convention is the same (rows are a, b, c vectors).
+    notes: "Same row convention (a, b, c). Unit conversion only."
 
   - source_field: atom_positions
     source_path: run[0].system[-1].atoms.positions
@@ -106,9 +81,7 @@ mappings:
       from_unit: m
       to_unit: Angstrom
       factor: 1.0e10
-    notes: >
-      Both are Cartesian coordinates. OPTIMADE mandates the same Cartesian
-      frame as the lattice vectors. Shape: (N, 3).
+    notes: "Same Cartesian frame as lattice_vectors. Unit conversion only."
 
   - source_field: atom_labels
     source_path: run[0].system[-1].atoms.labels
@@ -117,11 +90,7 @@ mappings:
     relation: exact
     confidence: 1.0
     transform: null
-    notes: >
-      Both are length-N lists of element symbol strings. OPTIMADE
-      species_at_sites values must match the name field of the species list.
-
-  # --- Band gap ---
+    notes: "Length-N list of element symbol strings."
 
   - source_field: band_gap
     source_path: run[0].calculation[-1].band_gap[0].value
@@ -134,11 +103,7 @@ mappings:
       from_unit: J
       to_unit: eV
       factor: 6.241509074e18
-    notes: >
-      NOMAD band_gap is a list (one entry per spin channel; [0] is the total).
-      OPTIMADE exposes the scalar value as a provider extension.
-
-  # --- Derived / structural metadata fields ---
+    notes: "band_gap[0] is the spin-averaged value. Unit conversion only."
 
   - source_field: periodicity
     source_path: run[0].system[-1].atoms.periodic
@@ -151,9 +116,7 @@ mappings:
       mapping:
         "true": "1"
         "false": "0"
-    notes: >
-      NOMAD stores periodicity as a length-3 boolean list. OPTIMADE dimension_types
-      is a length-3 list of integers (0 = non-periodic, 1 = periodic).
+    notes: "NOMAD: length-3 bool list. OPTIMADE: length-3 int list (0/1)."
 
   - source_field: n_periodic_dimensions
     source_path: run[0].system[-1].atoms.periodic
@@ -161,12 +124,8 @@ mappings:
     target_path: attributes.nperiodic_dimensions
     relation: exact
     confidence: 0.9
-    transform:
-      op: merge
-      description: sum of dimension_types entries
-    notes: Derived as sum(dimension_types). Bulk crystals are always 3.
-
-  # --- Explicit non-mappings (important for calibration) ---
+    transform: null
+    notes: "Derived as sum(dimension_types). Always 3 for bulk crystals."
 
   - source_field: energy_total
     source_path: run[0].calculation[-1].energy.total.value
@@ -175,11 +134,7 @@ mappings:
     relation: none
     confidence: 1.0
     transform: null
-    notes: >
-      energy_above_hull (convex hull stability) is a thermodynamic property
-      that requires comparing across many structures. It cannot be derived
-      from a single calculation's total energy. These are physically distinct
-      quantities and must not be mapped.
+    notes: "energy_above_hull is a convex-hull stability metric, not a single-calculation property."
 
   - source_field: energy_free
     source_path: run[0].calculation[-1].energy.free.value
@@ -188,7 +143,4 @@ mappings:
     relation: none
     confidence: 1.0
     transform: null
-    notes: >
-      Free energy F = E - TS differs from total energy at finite temperature.
-      At 0 K they are numerically equal for most DFT codes, but they are
-      distinct quantities. Map energy_total → _nomad_total_energy only.
+    notes: "F = E - TS; distinct from total energy even when numerically equal at 0 K."
