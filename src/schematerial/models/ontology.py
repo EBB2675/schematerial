@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class OntologyConcept(BaseModel):
@@ -11,4 +11,4 @@ class OntologyConcept(BaseModel):
 class OntologyModel(BaseModel):
     name: str
     namespace: str | None = None
-    concepts: list[OntologyConcept] = []
+    concepts: list[OntologyConcept] = Field(default_factory=list)

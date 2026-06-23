@@ -2,7 +2,7 @@ from schematerial.models.alignment import AlignmentMode
 from schematerial.models.annotation import AnnotationEntry, AnnotationMap
 from schematerial.models.crosswalk import MappingCandidate, MappingRelation
 from schematerial.models.ontology import OntologyConcept, OntologyModel
-from schematerial.models.schema import Entity, Field, SchemaModel
+from schematerial.models.schema import Entity, SchemaField, SchemaModel
 from schematerial.models.transform import (
     ArrayIndexOp,
     ConditionalOp,
@@ -22,7 +22,7 @@ __all__ = [
     "ConditionalOp",
     "Entity",
     "EnumRemapOp",
-    "Field",
+    "SchemaField",
     "MappingCandidate",
     "MappingRelation",
     "MergeOp",

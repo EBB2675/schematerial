@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AnnotationEntry(BaseModel):
@@ -12,4 +12,4 @@ class AnnotationEntry(BaseModel):
 
 class AnnotationMap(BaseModel):
     schema_name: str
-    entries: list[AnnotationEntry] = []
+    entries: list[AnnotationEntry] = Field(default_factory=list)

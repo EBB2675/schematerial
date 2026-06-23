@@ -6,7 +6,7 @@ AI agents assist with schema inspection, ontology grounding, ambiguity detection
 
 ## Local development
 
-**Prerequisites:** [uv](https://docs.astral.sh/uv/) and Python 3.13.
+**Prerequisites:** [uv](https://docs.astral.sh/uv/) and Python >=3.12.
 
 ```sh
 uv sync                  # install deps + editable package into .venv

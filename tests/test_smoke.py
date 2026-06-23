@@ -39,7 +39,7 @@ def test_cli_main_exists() -> None:
 def test_yaml_fixture_loads(name: str) -> None:
     path = FIXTURES_DIR / name
     assert path.exists(), f"Missing fixture file: {name}"
-    data = yaml.safe_load(path.read_text())
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert data is not None, f"{name} parsed as empty"
 
 
@@ -47,7 +47,7 @@ def test_yaml_fixture_loads(name: str) -> None:
 def test_json_fixture_loads(name: str) -> None:
     path = FIXTURES_DIR / name
     assert path.exists(), f"Missing fixture file: {name}"
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(data, dict), f"{name} did not parse to a dict"
 
 
