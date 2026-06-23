@@ -228,3 +228,6 @@ runs/
 
 # Source assets (binary, not for version control)
 LOGO.pdf
+
+# Internal planning documents
+schematerial_technical_plan.md
