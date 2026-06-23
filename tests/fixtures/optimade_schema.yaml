@@ -1,0 +1,73 @@
+# OPTIMADE v1.2: energies in eV, lengths in Angstroms
+# https://github.com/Materials-Consortia/OPTIMADE/blob/develop/optimade.rst
+
+name: "OPTIMADE"
+version: "1.2"
+description: "Flat REST API JSON under the attributes key. Provider-specific fields are prefixed with _<provider>_."
+
+fields:
+  - name: total_energy
+    path: attributes._nomad_total_energy
+    dtype: float
+    unit: eV
+    description: Total energy. NOMAD provider extension; no mandatory energy field in standard OPTIMADE.
+
+  - name: energy_per_atom
+    path: attributes._nomad_energy_per_atom
+    dtype: float
+    unit: eV/atom
+    description: Total energy per atom. NOMAD provider extension.
+
+  - name: nsites
+    path: attributes.nsites
+    dtype: int
+    unit: null
+    description: Number of sites in the structure.
+
+  - name: chemical_formula_reduced
+    path: attributes.chemical_formula_reduced
+    dtype: str
+    unit: null
+    description: Reduced formula with elements in alphabetical order (e.g. "AsGa").
+
+  - name: lattice_vectors
+    path: attributes.lattice_vectors
+    dtype: float[3][3]
+    unit: Angstrom
+    description: Lattice vectors as a 3×3 nested list. Mandatory for 3D-periodic structures.
+
+  - name: cartesian_site_positions
+    path: attributes.cartesian_site_positions
+    dtype: float[N][3]
+    unit: Angstrom
+    description: Cartesian positions of each site.
+
+  - name: species_at_sites
+    path: attributes.species_at_sites
+    dtype: str[N]
+    unit: null
+    description: Element symbol for each site, matching the species list.
+
+  - name: dimension_types
+    path: attributes.dimension_types
+    dtype: int[3]
+    unit: null
+    description: Periodicity per lattice direction as integers (0 = non-periodic, 1 = periodic).
+
+  - name: nperiodic_dimensions
+    path: attributes.nperiodic_dimensions
+    dtype: int
+    unit: null
+    description: Number of periodic dimensions; sum of dimension_types.
+
+  - name: band_gap
+    path: attributes._nomad_band_gap
+    dtype: float
+    unit: eV
+    description: Band gap. NOMAD provider extension.
+
+  - name: energy_above_hull
+    path: attributes.energy_above_hull
+    dtype: float
+    unit: eV
+    description: Convex-hull stability metric. Requires comparing across structures; not derivable from a single calculation.

@@ -1,0 +1,68 @@
+# CIF core: flat key-value crystallographic format, Angstroms + degrees
+# No energy or band gap fields; structure-only format.
+# https://www.iucr.org/resources/cif/dictionaries/cif_core
+
+name: "CIF core"
+version: "2.0"
+description: "Flat key-value crystallographic data. No electronic-structure fields."
+
+fields:
+  - name: cell_length_a
+    path: _cell_length_a
+    dtype: float
+    unit: Angstrom
+    description: a cell edge length.
+
+  - name: cell_length_b
+    path: _cell_length_b
+    dtype: float
+    unit: Angstrom
+    description: b cell edge length.
+
+  - name: cell_length_c
+    path: _cell_length_c
+    dtype: float
+    unit: Angstrom
+    description: c cell edge length.
+
+  - name: cell_angle_alpha
+    path: _cell_angle_alpha
+    dtype: float
+    unit: degree
+    description: Angle between b and c axes.
+
+  - name: cell_angle_beta
+    path: _cell_angle_beta
+    dtype: float
+    unit: degree
+    description: Angle between a and c axes.
+
+  - name: cell_angle_gamma
+    path: _cell_angle_gamma
+    dtype: float
+    unit: degree
+    description: Angle between a and b axes.
+
+  - name: chemical_formula_sum
+    path: _chemical_formula_sum
+    dtype: str
+    unit: null
+    description: Sum formula (e.g. "Si2", "Ga As").
+
+  - name: atom_site_fract_x
+    path: _atom_site_fract_x
+    dtype: float[N]
+    unit: null
+    description: Fractional x coordinate for each atom site.
+
+  - name: atom_site_fract_y
+    path: _atom_site_fract_y
+    dtype: float[N]
+    unit: null
+    description: Fractional y coordinate for each atom site.
+
+  - name: atom_site_fract_z
+    path: _atom_site_fract_z
+    dtype: float[N]
+    unit: null
+    description: Fractional z coordinate for each atom site.

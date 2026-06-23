@@ -1,0 +1,55 @@
+# Emmet (Materials Project): TaskDocument JSON, eV + Angstroms
+# https://github.com/materialsproject/emmet
+
+name: "Emmet"
+version: "0.84"
+description: "Pydantic-modelled JSON from Materials Project task documents. Structure data is serialised pymatgen."
+
+fields:
+  - name: energy
+    path: calcs_reversed[0].output.energy
+    dtype: float
+    unit: eV
+    description: Total DFT energy (VASP TOTEN).
+
+  - name: energy_per_atom
+    path: calcs_reversed[0].output.energy_per_atom
+    dtype: float
+    unit: eV/atom
+    description: Total energy divided by number of sites.
+
+  - name: nsites
+    path: nsites
+    dtype: int
+    unit: null
+    description: Number of sites in the output structure.
+
+  - name: formula_pretty
+    path: formula_pretty
+    dtype: str
+    unit: null
+    description: Reduced formula; pymatgen electronegativity ordering (diverges from Hill for binary+ systems).
+
+  - name: lattice_matrix
+    path: calcs_reversed[0].output.structure.lattice.matrix
+    dtype: float[3][3]
+    unit: Angstrom
+    description: Lattice vectors as a 3×3 matrix, rows are a, b, c.
+
+  - name: site_positions
+    path: calcs_reversed[0].output.structure.sites[].xyz
+    dtype: float[N][3]
+    unit: Angstrom
+    description: Cartesian coordinates of each site.
+
+  - name: site_labels
+    path: calcs_reversed[0].output.structure.sites[].label
+    dtype: str[N]
+    unit: null
+    description: Element symbol for each site.
+
+  - name: band_gap
+    path: calcs_reversed[0].output.bandgap
+    dtype: float
+    unit: eV
+    description: DFT band gap. Zero for metals.

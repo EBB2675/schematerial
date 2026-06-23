@@ -1,0 +1,44 @@
+{
+  "task_id": "mp-149",
+  "formula_pretty": "Si",
+  "nsites": 2,
+  "calcs_reversed": [
+    {
+      "output": {
+        "energy": -10.786,
+        "energy_per_atom": -5.393,
+        "bandgap": 0.62,
+        "structure": {
+          "lattice": {
+            "matrix": [
+              [0.0, 2.7155, 2.7155],
+              [2.7155, 0.0, 2.7155],
+              [2.7155, 2.7155, 0.0]
+            ],
+            "a": 3.84,
+            "b": 3.84,
+            "c": 3.84,
+            "alpha": 60.0,
+            "beta": 60.0,
+            "gamma": 60.0,
+            "volume": 40.04
+          },
+          "sites": [
+            {
+              "species": [{"element": "Si", "occu": 1.0}],
+              "abc": [0.0, 0.0, 0.0],
+              "xyz": [0.0, 0.0, 0.0],
+              "label": "Si"
+            },
+            {
+              "species": [{"element": "Si", "occu": 1.0}],
+              "abc": [0.25, 0.25, 0.25],
+              "xyz": [1.3578, 1.3578, 1.3578],
+              "label": "Si"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

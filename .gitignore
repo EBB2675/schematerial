@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Pyright cache
+.pyright/
+
+# Schematerial generated alignment outputs
+runs/
+
+# macOS
+.DS_Store
+
+# Source assets (binary, not for version control)
+LOGO.pdf
+
+# Internal planning documents
+schematerial_technical_plan.md

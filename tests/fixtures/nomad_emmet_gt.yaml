@@ -1,0 +1,106 @@
+# NOMAD Metainfo ↔ Emmet (Materials Project): discovery ground truth
+# Hand-written; no production crosswalk exists between these schemas.
+# Provenance:
+#   NOMAD: https://nomad-lab.eu/prod/v1/staging/docs/reference/archive.html
+#   Emmet: https://github.com/materialsproject/emmet (TaskDocument)
+
+metadata:
+  role: discovery
+  source_schema: "NOMAD Metainfo"
+  target_schema: "Emmet"
+  confidence_basis: hand-written domain expert review
+  created: "2026-06-23"
+
+mappings:
+
+  - source_field: energy_total
+    source_path: run[0].calculation[-1].energy.total.value
+    target_field: energy
+    target_path: calcs_reversed[0].output.energy
+    relation: exact
+    confidence: 0.95
+    transform:
+      op: unit_conversion
+      from_unit: J
+      to_unit: eV
+      factor: 6.241509074e18
+    notes: "Both refer to the final ionic step, but verify for multi-step relaxations."
+
+  - source_field: energy_total_per_atom
+    source_path: run[0].calculation[-1].energy.total.value_per_atom
+    target_field: energy_per_atom
+    target_path: calcs_reversed[0].output.energy_per_atom
+    relation: exact
+    confidence: 0.95
+    transform:
+      op: unit_conversion
+      from_unit: J
+      to_unit: eV
+      factor: 6.241509074e18
+    notes: "Same indexing caveat as energy_total."
+
+  - source_field: n_atoms
+    source_path: run[0].system[-1].atoms.n_atoms
+    target_field: nsites
+    target_path: nsites
+    relation: exact
+    confidence: 1.0
+    transform: null
+    notes: "Emmet nsites is top-level on TaskDocument, not nested under calcs_reversed."
+
+  - source_field: chemical_composition_reduced
+    source_path: run[0].system[-1].chemical_composition_reduced
+    target_field: formula_pretty
+    target_path: formula_pretty
+    relation: close
+    confidence: 0.85
+    transform: null
+    notes: "NOMAD: Hill order. Emmet: pymatgen electronegativity order. Identical for single-element systems; diverges for binary+."
+
+  - source_field: lattice_vectors
+    source_path: run[0].system[-1].atoms.lattice_vectors
+    target_field: lattice_matrix
+    target_path: calcs_reversed[0].output.structure.lattice.matrix
+    relation: exact
+    confidence: 0.95
+    transform:
+      op: unit_conversion
+      from_unit: m
+      to_unit: Angstrom
+      factor: 1.0e10
+    notes: "Same row convention. Unit conversion only."
+
+  - source_field: atom_positions
+    source_path: run[0].system[-1].atoms.positions
+    target_field: site_positions
+    target_path: calcs_reversed[0].output.structure.sites[].xyz
+    relation: exact
+    confidence: 0.9
+    transform:
+      op: unit_conversion
+      from_unit: m
+      to_unit: Angstrom
+      factor: 1.0e10
+    notes: "Prefer xyz over sites[].abc. [] indicates per-site array indexing."
+
+  - source_field: atom_labels
+    source_path: run[0].system[-1].atoms.labels
+    target_field: site_labels
+    target_path: calcs_reversed[0].output.structure.sites[].label
+    relation: exact
+    confidence: 0.9
+    transform: null
+    notes: "For elemental sites, site.label equals the element symbol."
+
+  - source_field: band_gap
+    source_path: run[0].calculation[-1].band_gap[0].value
+    target_field: band_gap
+    target_path: calcs_reversed[0].output.bandgap
+    relation: exact
+    confidence: 0.85
+    transform:
+      op: unit_conversion
+      from_unit: J
+      to_unit: eV
+      factor: 6.241509074e18
+    notes: "Emmet output.bandgap is the minimum gap across spin channels; NOMAD band_gap[0] is spin-averaged. Equivalent for non-spin-polarised calculations."
