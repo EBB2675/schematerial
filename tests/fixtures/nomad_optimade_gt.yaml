@@ -1,0 +1,194 @@
+# NOMAD Metainfo ↔ OPTIMADE ground truth
+#
+# role: calibration
+# NOMAD is an OPTIMADE provider. This mapping is implemented in production
+# in the NOMAD codebase (nomad-lab package, optimade module). Use this file
+# to verify that Schematerial reproduces the known-good alignment — do NOT
+# use it as evidence that the tool solves a discovery problem.
+#
+# provenance:
+#   primary:  NOMAD OPTIMADE adapter (nomad/app/v1/routers/optimade.py and
+#             nomad/normalizing/optimade.py in the nomad-lab GitLab repo)
+#   spec:     https://github.com/Materials-Consortia/OPTIMADE (v1.2)
+#   notes:    Standard OPTIMADE has no mandatory energy field. NOMAD exposes
+#             energies and band gap as provider-specific extensions prefixed
+#             with _nomad_. Energy and length unit conversions are the primary
+#             transform challenge; the conversion factors are exact by definition
+#             (1 eV = 1.602176634e-19 J, 1 Å = 1e-10 m).
+
+metadata:
+  role: calibration
+  source_schema: "NOMAD Metainfo"
+  target_schema: "OPTIMADE v1.2"
+  confidence_basis: production adapter code
+  created: "2026-06-23"
+
+mappings:
+
+  # --- Energy fields ---
+
+  - source_field: energy_total
+    source_path: run[0].calculation[-1].energy.total.value
+    target_field: total_energy
+    target_path: attributes._nomad_total_energy
+    relation: exact
+    confidence: 1.0
+    transform:
+      op: unit_conversion
+      from_unit: J
+      to_unit: eV
+      factor: 6.241509074e18
+    notes: >
+      NOMAD stores DFT total energy in SI (Joules). OPTIMADE exposes it as a
+      provider-specific extension in eV. The quantity is the same: DFT SCF
+      total energy.
+
+  - source_field: energy_total_per_atom
+    source_path: run[0].calculation[-1].energy.total.value_per_atom
+    target_field: energy_per_atom
+    target_path: attributes._nomad_energy_per_atom
+    relation: exact
+    confidence: 1.0
+    transform:
+      op: unit_conversion
+      from_unit: J
+      to_unit: eV
+      factor: 6.241509074e18
+    notes: >
+      Derived field in both schemas (total / n_atoms). The transform is the
+      same unit conversion as energy_total.
+
+  # --- Structure fields ---
+
+  - source_field: n_atoms
+    source_path: run[0].system[-1].atoms.n_atoms
+    target_field: nsites
+    target_path: attributes.nsites
+    relation: exact
+    confidence: 1.0
+    transform: null
+    notes: Direct integer equality. OPTIMADE nsites is mandatory.
+
+  - source_field: chemical_composition_reduced
+    source_path: run[0].system[-1].chemical_composition_reduced
+    target_field: chemical_formula_reduced
+    target_path: attributes.chemical_formula_reduced
+    relation: close
+    confidence: 0.95
+    transform: null
+    notes: >
+      Both are reduced formulas, but element ordering may differ. OPTIMADE
+      requires alphabetical ordering (e.g. "AsGa"); NOMAD follows Hill
+      convention (C first, then H, then alphabetical). For single-element
+      systems these are identical.
+
+  - source_field: lattice_vectors
+    source_path: run[0].system[-1].atoms.lattice_vectors
+    target_field: lattice_vectors
+    target_path: attributes.lattice_vectors
+    relation: exact
+    confidence: 1.0
+    transform:
+      op: unit_conversion
+      from_unit: m
+      to_unit: Angstrom
+      factor: 1.0e10
+    notes: Both are 3×3 matrices. Row convention is the same (rows are a, b, c vectors).
+
+  - source_field: atom_positions
+    source_path: run[0].system[-1].atoms.positions
+    target_field: cartesian_site_positions
+    target_path: attributes.cartesian_site_positions
+    relation: exact
+    confidence: 1.0
+    transform:
+      op: unit_conversion
+      from_unit: m
+      to_unit: Angstrom
+      factor: 1.0e10
+    notes: >
+      Both are Cartesian coordinates. OPTIMADE mandates the same Cartesian
+      frame as the lattice vectors. Shape: (N, 3).
+
+  - source_field: atom_labels
+    source_path: run[0].system[-1].atoms.labels
+    target_field: species_at_sites
+    target_path: attributes.species_at_sites
+    relation: exact
+    confidence: 1.0
+    transform: null
+    notes: >
+      Both are length-N lists of element symbol strings. OPTIMADE
+      species_at_sites values must match the name field of the species list.
+
+  # --- Band gap ---
+
+  - source_field: band_gap
+    source_path: run[0].calculation[-1].band_gap[0].value
+    target_field: band_gap
+    target_path: attributes._nomad_band_gap
+    relation: exact
+    confidence: 1.0
+    transform:
+      op: unit_conversion
+      from_unit: J
+      to_unit: eV
+      factor: 6.241509074e18
+    notes: >
+      NOMAD band_gap is a list (one entry per spin channel; [0] is the total).
+      OPTIMADE exposes the scalar value as a provider extension.
+
+  # --- Derived / structural metadata fields ---
+
+  - source_field: periodicity
+    source_path: run[0].system[-1].atoms.periodic
+    target_field: dimension_types
+    target_path: attributes.dimension_types
+    relation: exact
+    confidence: 0.9
+    transform:
+      op: enum_remap
+      mapping:
+        "true": "1"
+        "false": "0"
+    notes: >
+      NOMAD stores periodicity as a length-3 boolean list. OPTIMADE dimension_types
+      is a length-3 list of integers (0 = non-periodic, 1 = periodic).
+
+  - source_field: n_periodic_dimensions
+    source_path: run[0].system[-1].atoms.periodic
+    target_field: nperiodic_dimensions
+    target_path: attributes.nperiodic_dimensions
+    relation: exact
+    confidence: 0.9
+    transform:
+      op: merge
+      description: sum of dimension_types entries
+    notes: Derived as sum(dimension_types). Bulk crystals are always 3.
+
+  # --- Explicit non-mappings (important for calibration) ---
+
+  - source_field: energy_total
+    source_path: run[0].calculation[-1].energy.total.value
+    target_field: energy_above_hull
+    target_path: attributes.energy_above_hull
+    relation: none
+    confidence: 1.0
+    transform: null
+    notes: >
+      energy_above_hull (convex hull stability) is a thermodynamic property
+      that requires comparing across many structures. It cannot be derived
+      from a single calculation's total energy. These are physically distinct
+      quantities and must not be mapped.
+
+  - source_field: energy_free
+    source_path: run[0].calculation[-1].energy.free.value
+    target_field: total_energy
+    target_path: attributes._nomad_total_energy
+    relation: none
+    confidence: 1.0
+    transform: null
+    notes: >
+      Free energy F = E - TS differs from total energy at finite temperature.
+      At 0 K they are numerically equal for most DFT codes, but they are
+      distinct quantities. Map energy_total → _nomad_total_energy only.
