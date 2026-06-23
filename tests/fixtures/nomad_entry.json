@@ -24,14 +24,14 @@
         {
           "energy": {
             "total": {
-              "value": -3.4553e-17,
-              "value_per_atom": -1.7277e-17
+              "value": -1.7280e-18,
+              "value_per_atom": -8.6401e-19
             }
           },
           "band_gap": [
             {
               "value": 9.94e-20,
-              "type": "direct"
+              "type": "indirect"
             }
           ]
         }

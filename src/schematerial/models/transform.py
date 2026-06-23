@@ -1,44 +1,46 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class TransformOp(BaseModel):
-    op: str
+    ...
 
 
 class UnitConversionOp(TransformOp):
-    op: str = "unit_conversion"
+    op: Literal["unit_conversion"] = "unit_conversion"
     from_unit: str
     to_unit: str
     factor: float | None = None
 
 
 class PerAtomRescaleOp(TransformOp):
-    op: str = "per_atom_rescale"
+    op: Literal["per_atom_rescale"] = "per_atom_rescale"
     direction: str
 
 
 class SplitOp(TransformOp):
-    op: str = "split"
+    op: Literal["split"] = "split"
     source_field: str
     target_fields: list[str]
 
 
 class MergeOp(TransformOp):
-    op: str = "merge"
+    op: Literal["merge"] = "merge"
     source_fields: list[str]
     target_field: str
 
 
 class ArrayIndexOp(TransformOp):
-    op: str = "array_index"
+    op: Literal["array_index"] = "array_index"
     index: int
 
 
 class EnumRemapOp(TransformOp):
-    op: str = "enum_remap"
+    op: Literal["enum_remap"] = "enum_remap"
     mapping: dict[str, str]
 
 
 class ConditionalOp(TransformOp):
-    op: str = "conditional"
+    op: Literal["conditional"] = "conditional"
     condition: str

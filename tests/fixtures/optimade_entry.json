@@ -24,8 +24,8 @@
       {"name": "Si", "chemical_symbols": ["Si"], "concentration": [1.0]}
     ],
     "structure_features": [],
-    "_nomad_total_energy": -215.72,
-    "_nomad_energy_per_atom": -107.86,
+    "_nomad_total_energy": -10.786,
+    "_nomad_energy_per_atom": -5.393,
     "_nomad_band_gap": 0.62
   }
 }
