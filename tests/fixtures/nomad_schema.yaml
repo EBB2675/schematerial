@@ -42,8 +42,26 @@ fields:
     unit: m
     description: Cartesian positions of each atom.
 
+  - name: atom_labels
+    path: run[0].system[-1].atoms.labels
+    dtype: str[N]
+    unit: null
+    description: Element symbol for each atom site.
+
+  - name: periodicity
+    path: run[0].system[-1].atoms.periodic
+    dtype: bool[3]
+    unit: null
+    description: Periodicity along each lattice direction.
+
   - name: band_gap
     path: run[0].calculation[-1].band_gap[0].value
     dtype: float
     unit: J
     description: Electronic band gap. Zero for metals.
+
+  - name: energy_free
+    path: run[0].calculation[-1].energy.free.value
+    dtype: float
+    unit: J
+    description: Free energy F = E - TS. Distinct from total energy at finite temperature.

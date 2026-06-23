@@ -42,6 +42,12 @@ fields:
     unit: Angstrom
     description: Cartesian coordinates of each site.
 
+  - name: site_labels
+    path: calcs_reversed[0].output.structure.sites[].label
+    dtype: str[N]
+    unit: null
+    description: Element symbol for each site.
+
   - name: band_gap
     path: calcs_reversed[0].output.bandgap
     dtype: float

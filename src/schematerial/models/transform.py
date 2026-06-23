@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class TransformOp(BaseModel):
-    op: str = ""
+    op: str
 
 
 class UnitConversionOp(TransformOp):

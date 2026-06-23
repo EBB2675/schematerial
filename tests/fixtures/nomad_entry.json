@@ -6,6 +6,7 @@
           "atoms": {
             "n_atoms": 2,
             "labels": ["Si", "Si"],
+            "periodic": [true, true, true],
             "lattice_vectors": [
               [0.0, 2.7155e-10, 2.7155e-10],
               [2.7155e-10, 0.0, 2.7155e-10],

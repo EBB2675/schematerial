@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class MappingRelation(Enum):
+class MappingRelation(StrEnum):
     EXACT = "exact"
     CLOSE = "close"
     BROADER = "broader"
