@@ -1,5 +1,3 @@
-# schematerial
-
 ![schematerial logo](logo.png)
 
 Schematerial translates between heterogeneous materials-science data models by generating semantic crosswalks, executable mappings, and human-in-the-loop alignment reports. 
