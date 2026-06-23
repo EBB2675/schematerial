@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Pyright cache
+.pyright/
+
+# Schematerial generated alignment outputs
+runs/
