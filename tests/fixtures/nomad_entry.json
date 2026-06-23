@@ -1,0 +1,40 @@
+{
+  "run": [
+    {
+      "system": [
+        {
+          "atoms": {
+            "n_atoms": 2,
+            "labels": ["Si", "Si"],
+            "lattice_vectors": [
+              [0.0, 2.7155e-10, 2.7155e-10],
+              [2.7155e-10, 0.0, 2.7155e-10],
+              [2.7155e-10, 2.7155e-10, 0.0]
+            ],
+            "positions": [
+              [0.0, 0.0, 0.0],
+              [1.3578e-10, 1.3578e-10, 1.3578e-10]
+            ]
+          },
+          "chemical_composition_reduced": "Si"
+        }
+      ],
+      "calculation": [
+        {
+          "energy": {
+            "total": {
+              "value": -3.4553e-17,
+              "value_per_atom": -1.7277e-17
+            }
+          },
+          "band_gap": [
+            {
+              "value": 9.94e-20,
+              "type": "direct"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

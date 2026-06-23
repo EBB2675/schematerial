@@ -1,0 +1,59 @@
+# OPTIMADE v1.2 — hand-curated schema fixture
+# Units: eV for energies, Angstroms for lengths.
+# Mandatory fields only, plus common provider-specific extensions.
+# Source: https://github.com/Materials-Consortia/OPTIMADE/blob/develop/optimade.rst
+
+name: "OPTIMADE"
+version: "1.2"
+description: >
+  Flat REST API JSON structure under the "attributes" key of a structure entry.
+  Provider-specific fields are prefixed with _<provider>_ (e.g. _nomad_).
+
+fields:
+  - name: total_energy
+    path: attributes._nomad_total_energy
+    dtype: float
+    unit: eV
+    description: >
+      Provider-specific total energy. Standard OPTIMADE has no mandatory energy
+      field; this is the NOMAD OPTIMADE extension.
+
+  - name: energy_per_atom
+    path: attributes._nomad_energy_per_atom
+    dtype: float
+    unit: eV/atom
+    description: Provider-specific total energy per atom.
+
+  - name: nsites
+    path: attributes.nsites
+    dtype: int
+    unit: null
+    description: Number of sites (atoms) in the structure. Mandatory OPTIMADE field.
+
+  - name: chemical_formula_reduced
+    path: attributes.chemical_formula_reduced
+    dtype: str
+    unit: null
+    description: >
+      Reduced chemical formula with element symbols sorted alphabetically
+      (e.g. "Si", "AsGa"). Mandatory OPTIMADE field.
+
+  - name: lattice_vectors
+    path: attributes.lattice_vectors
+    dtype: float[3][3]
+    unit: Angstrom
+    description: >
+      The three lattice vectors as a 3x3 nested list in Angstroms.
+      Mandatory for 3D-periodic structures.
+
+  - name: cartesian_site_positions
+    path: attributes.cartesian_site_positions
+    dtype: float[N][3]
+    unit: Angstrom
+    description: Cartesian positions of each site in Angstroms. Mandatory OPTIMADE field.
+
+  - name: band_gap
+    path: attributes._nomad_band_gap
+    dtype: float
+    unit: eV
+    description: Provider-specific band gap. Not a mandatory OPTIMADE field.

@@ -1,0 +1,31 @@
+{
+  "id": "nomad/Si_primitive",
+  "type": "structures",
+  "attributes": {
+    "nsites": 2,
+    "chemical_formula_reduced": "Si",
+    "chemical_formula_descriptive": "Si2",
+    "chemical_formula_anonymous": "A2",
+    "elements": ["Si"],
+    "nelements": 1,
+    "dimension_types": [1, 1, 1],
+    "nperiodic_dimensions": 3,
+    "lattice_vectors": [
+      [0.0, 2.7155, 2.7155],
+      [2.7155, 0.0, 2.7155],
+      [2.7155, 2.7155, 0.0]
+    ],
+    "cartesian_site_positions": [
+      [0.0, 0.0, 0.0],
+      [1.3578, 1.3578, 1.3578]
+    ],
+    "species_at_sites": ["Si", "Si"],
+    "species": [
+      {"name": "Si", "chemical_symbols": ["Si"], "concentration": [1.0]}
+    ],
+    "structure_features": [],
+    "_nomad_total_energy": -215.72,
+    "_nomad_energy_per_atom": -107.86,
+    "_nomad_band_gap": 0.62
+  }
+}
