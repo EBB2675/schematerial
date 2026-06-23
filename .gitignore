@@ -222,3 +222,9 @@ __marimo__/
 
 # Schematerial generated alignment outputs
 runs/
+
+# macOS
+.DS_Store
+
+# Source assets (binary, not for version control)
+LOGO.pdf
