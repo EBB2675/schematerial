@@ -7,7 +7,7 @@
 metadata:
   role: calibration
   source_schema: "NOMAD Metainfo"
-  target_schema: "OPTIMADE v1.2"
+  target_schema: "OPTIMADE"
   confidence_basis: production adapter code
   created: "2026-06-23"
 
