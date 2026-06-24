@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def _schematerial_version() -> str:
@@ -48,6 +48,18 @@ class MappingCandidate(BaseModel):
     context_note: str | None = None
     transform: dict[str, Any] | None = None
     review_note: str | None = None
+
+    @model_validator(mode="after")
+    def _derive_status_from_score(self) -> Self:
+        if self.score is None or "status" in self.model_fields_set:
+            return self
+        if self.score >= 0.85:
+            self.status = MappingStatus.AUTO_ACCEPTED
+        elif self.score >= 0.40:
+            self.status = MappingStatus.NEEDS_REVIEW
+        else:
+            self.status = MappingStatus.LIKELY_NO_MATCH
+        return self
 
 
 class CrosswalkMetadata(BaseModel):
