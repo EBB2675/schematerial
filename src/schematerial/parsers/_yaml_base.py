@@ -130,8 +130,18 @@ def parse_yaml_schema(source: str | Path, format: str) -> SchemaModel:
             f"(expected a mapping, got {type(raw).__name__})"
         )
 
+    raw_fields = raw.get("fields", [])
+    if not isinstance(raw_fields, list):
+        raise ValueError(
+            f"{path}: 'fields' must be a list of mappings, got {type(raw_fields).__name__}"
+        )
+
     fields: list[SchemaField] = []
-    for entry in raw.get("fields", []):
+    for entry in raw_fields:
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"{path}: each entry in 'fields' must be a mapping, got {type(entry).__name__}"
+            )
         name: str = entry["name"]
         field_path: str = entry["path"]
         unit: str | None = entry.get("unit")

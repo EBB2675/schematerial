@@ -51,7 +51,7 @@ class MappingCandidate(BaseModel):
 
     @model_validator(mode="after")
     def _derive_status_from_score(self) -> Self:
-        if self.score is None:
+        if self.score is None or "status" in self.model_fields_set:
             return self
         if self.score >= 0.85:
             self.status = MappingStatus.AUTO_ACCEPTED
