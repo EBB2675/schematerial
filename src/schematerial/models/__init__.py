@@ -1,8 +1,20 @@
-from schematerial.models.alignment import AlignmentMode
+from schematerial.models.alignment import AlignmentMode, AlignmentResult
 from schematerial.models.annotation import AnnotationEntry, AnnotationMap
-from schematerial.models.crosswalk import MappingCandidate, MappingRelation
-from schematerial.models.ontology import OntologyConcept, OntologyModel
-from schematerial.models.schema import Entity, SchemaField, SchemaModel
+from schematerial.models.crosswalk import (
+    CrosswalkMetadata,
+    CrosswalkResult,
+    MappingCandidate,
+    MappingRelation,
+    MappingStatus,
+)
+from schematerial.models.ontology import OntologyConcept, OntologyModel, OntologyTerm
+from schematerial.models.schema import (
+    CoordinateFrame,
+    Entity,
+    SchemaField,
+    SchemaModel,
+    SemanticType,
+)
 from schematerial.models.transform import (
     ArrayIndexOp,
     ConditionalOp,
@@ -16,20 +28,27 @@ from schematerial.models.transform import (
 
 __all__ = [
     "AlignmentMode",
+    "AlignmentResult",
     "AnnotationEntry",
     "AnnotationMap",
     "ArrayIndexOp",
+    "CoordinateFrame",
     "ConditionalOp",
+    "CrosswalkMetadata",
+    "CrosswalkResult",
     "Entity",
     "EnumRemapOp",
-    "SchemaField",
     "MappingCandidate",
     "MappingRelation",
+    "MappingStatus",
     "MergeOp",
     "OntologyConcept",
     "OntologyModel",
+    "OntologyTerm",
     "PerAtomRescaleOp",
+    "SchemaField",
     "SchemaModel",
+    "SemanticType",
     "SplitOp",
     "TransformOp",
     "UnitConversionOp",
