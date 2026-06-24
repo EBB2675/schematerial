@@ -1,8 +1,17 @@
 from datetime import UTC, datetime
 from enum import StrEnum
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+def _schematerial_version() -> str:
+    try:
+        return _pkg_version("schematerial")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 class MappingRelation(StrEnum):
@@ -46,7 +55,7 @@ class CrosswalkMetadata(BaseModel):
     source_version: str | None = None
     target_model: str
     target_version: str | None = None
-    schematerial_version: str = "0.0.0"
+    schematerial_version: str = Field(default_factory=_schematerial_version)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     review_status: str = "draft"
     n_accepted: int = 0

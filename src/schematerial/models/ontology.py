@@ -14,10 +14,10 @@ class OntologyTerm(BaseModel):
 
 
 class OntologyConcept(BaseModel):
-    iri: str
+    uri: str
     label: str | None = None
     description: str | None = None
-    parent_iri: str | None = None
+    parent_uri: str | None = None
 
 
 class OntologyModel(BaseModel):

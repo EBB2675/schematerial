@@ -217,7 +217,7 @@ def test_mapping_candidate_with_score_breakdown() -> None:
 def test_crosswalk_metadata_defaults() -> None:
     m = CrosswalkMetadata(source_model="nomad", target_model="optimade")
     assert m.review_status == "draft"
-    assert m.schematerial_version == "0.0.0"
+    assert isinstance(m.schematerial_version, str) and m.schematerial_version != ""
     assert m.n_accepted == 0
     assert m.n_needs_review == 0
     assert m.n_no_match == 0
