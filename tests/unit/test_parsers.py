@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 
 from schematerial.models.schema import CoordinateFrame, SchemaField, SchemaModel, SemanticType
-from schematerial.parsers._yaml_base import _detect_per_atom, _infer_semantic_type, _parse_dtype
+from schematerial.parsers._yaml_base import (
+    _detect_per_atom,
+    _infer_semantic_type,
+    _parse_dtype,
+    parse_yaml_schema,
+)
 from schematerial.parsers.base import Parser
 from schematerial.parsers.emmet import EmmetParser
 from schematerial.parsers.nomad import NomadParser
@@ -49,6 +54,12 @@ def test_parse_dtype_variable_shape() -> None:
 
 def test_parse_dtype_none() -> None:
     assert _parse_dtype(None) == ("unknown", None)
+
+
+def test_parse_dtype_unrecognised_token_does_not_crash() -> None:
+    # [M] is not N or digits — fullmatch fails, returns raw string with no shape
+    result = _parse_dtype("float[M]")
+    assert result == ("float[M]", None)
 
 
 # --- semantic type inference ---
@@ -98,6 +109,21 @@ def test_infer_label() -> None:
         "atom_labels", "system.atoms.labels", "Element symbol for each atom site."
     )
     assert result == SemanticType.LABEL
+
+
+def test_infer_cell_length_is_lattice_parameter() -> None:
+    result = _infer_semantic_type("cell_length_a", "_cell_length_a", "a cell edge length.")
+    assert result == SemanticType.LATTICE_PARAMETER
+
+
+def test_infer_cell_angle_is_lattice_parameter() -> None:
+    result = _infer_semantic_type("cell_angle_alpha", "_cell_angle_alpha", "Cell angle alpha.")
+    assert result == SemanticType.LATTICE_PARAMETER
+
+
+def test_infer_generic_length() -> None:
+    result = _infer_semantic_type("bond_length", "structure.bond_length", "Bond length in Å.")
+    assert result == SemanticType.LENGTH
 
 
 # --- per_atom detection ---
@@ -331,3 +357,20 @@ def test_emmet_nsites(emmet_schema: SchemaModel) -> None:
 def test_parser_accepts_str_path() -> None:
     schema = NomadParser().parse(str(FIXTURES / "nomad_schema.yaml"))
     assert schema.format == "nomad"
+
+
+# --- YAML validation ---
+
+
+def test_parse_yaml_schema_rejects_list(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("- item1\n- item2\n")
+    with pytest.raises(ValueError, match="expected a mapping"):
+        parse_yaml_schema(bad, format="nomad")
+
+
+def test_parse_yaml_schema_rejects_empty(tmp_path: Path) -> None:
+    empty = tmp_path / "empty.yaml"
+    empty.write_text("")
+    with pytest.raises(ValueError, match="expected a mapping"):
+        parse_yaml_schema(empty, format="nomad")

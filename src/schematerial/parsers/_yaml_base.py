@@ -20,7 +20,6 @@ and per-atom flags derived from the field name, path, and description.
 
 import re
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -44,14 +43,15 @@ def _parse_dtype(raw: str | None) -> tuple[str, list[int | None] | None]:
     """
     if not raw:
         return "unknown", None
-    m = re.fullmatch(r"(\w+)((?:\[\w+\])*)", raw.strip())
+    # Only accept N or digits inside brackets — anything else is an unrecognised token
+    m = re.fullmatch(r"(\w+)((?:\[(?:N|\d+)\])*)", raw.strip())
     if not m:
         return raw, None
     base = m.group(1)
     dims_str = m.group(2)
     if not dims_str:
         return base, None
-    dims = re.findall(r"\[(\w+)\]", dims_str)
+    dims = re.findall(r"\[(N|\d+)\]", dims_str)
     shape: list[int | None] = [None if d == "N" else int(d) for d in dims]
     return base, shape
 
@@ -81,8 +81,14 @@ def _infer_semantic_type(name: str, path: str, description: str | None) -> Seman
         return SemanticType.KPOINT
     if "position" in text and ("atom" in text or "site" in text or "cartesian" in text):
         return SemanticType.ATOMIC_POSITION
-    if "lattice" in text and ("vector" in text or "matrix" in text or "param" in text):
+    if (
+        "cell_length" in text
+        or "cell_angle" in text
+        or ("lattice" in text and ("vector" in text or "matrix" in text or "param" in text))
+    ):
         return SemanticType.LATTICE_PARAMETER
+    if "length" in text:
+        return SemanticType.LENGTH
     if "periodic" in text or "dimension_type" in text:
         return SemanticType.FLAG
     if (
@@ -117,7 +123,12 @@ def _detect_coordinate_frame(name: str, description: str | None) -> CoordinateFr
 def parse_yaml_schema(source: str | Path, format: str) -> SchemaModel:
     """Load a schematerial fixture YAML file and return a SchemaModel."""
     path = Path(source)
-    raw: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8"))
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"{path} is not a valid schema YAML file "
+            f"(expected a mapping, got {type(raw).__name__})"
+        )
 
     fields: list[SchemaField] = []
     for entry in raw.get("fields", []):

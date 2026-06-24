@@ -211,6 +211,27 @@ def test_mapping_candidate_with_score_breakdown() -> None:
     assert len(c.evidence) == 2
 
 
+def test_mapping_candidate_status_derived_from_score() -> None:
+    def _make(score: float) -> MappingCandidate:
+        return MappingCandidate(
+            source_field="a", target_field="b", relation=MappingRelation.EXACT, score=score
+        )
+
+    assert _make(0.90).status == MappingStatus.AUTO_ACCEPTED
+    assert _make(0.85).status == MappingStatus.AUTO_ACCEPTED
+    assert _make(0.60).status == MappingStatus.NEEDS_REVIEW
+    assert _make(0.40).status == MappingStatus.NEEDS_REVIEW
+    assert _make(0.20).status == MappingStatus.LIKELY_NO_MATCH
+    assert _make(0.00).status == MappingStatus.LIKELY_NO_MATCH
+
+
+def test_mapping_candidate_no_score_keeps_default_status() -> None:
+    c = MappingCandidate(
+        source_field="a", target_field="b", relation=MappingRelation.EXACT
+    )
+    assert c.status == MappingStatus.NEEDS_REVIEW
+
+
 # --- CrosswalkMetadata ---
 
 
