@@ -126,8 +126,7 @@ def parse_yaml_schema(source: str | Path, format: str) -> SchemaModel:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(
-            f"{path} is not a valid schema YAML file "
-            f"(expected a mapping, got {type(raw).__name__})"
+            f"{path} is not a valid schema YAML file (expected a mapping, got {type(raw).__name__})"
         )
 
     raw_fields = raw.get("fields", [])
