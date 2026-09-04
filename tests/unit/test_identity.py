@@ -81,8 +81,6 @@ def test_prefix_map_is_exactly_decision_1() -> None:
     assert set(PREFIXES) == {
         "nomadsim",
         "nomadmeas",
-        "emmet",
-        "optimade",
         "bammd",
         "pmdco",
         "smat",
@@ -104,7 +102,7 @@ def test_unknown_prefix_is_rejected_and_names_the_known_ones() -> None:
 @pytest.mark.parametrize(
     ("source", "segments", "expected"),
     [
-        pytest.param(Source.EMMET, ["TaskDocument"], "emmet:TaskDocument", id="class"),
+        pytest.param(Source.PMDCO, ["Material"], "pmdco:Material", id="class"),
         pytest.param(
             Source.NOMAD_SIMULATION,
             ["Run", "calculation", "energy", "total", "value"],
@@ -112,9 +110,9 @@ def test_unknown_prefix_is_rejected_and_names_the_known_ones() -> None:
             id="nested-attribute",
         ),
         pytest.param(
-            Source.OPTIMADE,
-            ["Structure", "chemical_formula.reduced"],
-            "optimade:Structure.chemical_formula%2Ereduced",
+            Source.BAM_MASTERDATA,
+            ["Sample", "property.code"],
+            "bammd:Sample.property%2Ecode",
             id="name-containing-a-dot",
         ),
         pytest.param(
@@ -139,17 +137,17 @@ def test_identity_round_trips(source: Source, segments: list[str], expected: str
 
 def test_a_dotted_name_does_not_look_like_a_deeper_path() -> None:
     """The escape is what makes the reverse parser exact."""
-    escaped = element_id("optimade", ["Structure", "chemical_formula.reduced"])
-    nested = element_id("optimade", ["Structure", "chemical_formula", "reduced"])
+    escaped = element_id("bammd", ["Sample", "property.code"])
+    nested = element_id("bammd", ["Sample", "property", "code"])
     assert escaped != nested
-    assert parse_element_id(escaped).segments == ("Structure", "chemical_formula.reduced")
-    assert parse_element_id(nested).segments == ("Structure", "chemical_formula", "reduced")
+    assert parse_element_id(escaped).segments == ("Sample", "property.code")
+    assert parse_element_id(nested).segments == ("Sample", "property", "code")
 
 
 def test_parsed_id_reports_its_parent() -> None:
     assert parse_element_id("nomadsim:Run.system.atoms").parent == "Run.system"
     assert parse_element_id("nomadsim:Run").parent is None
-    assert parse_element_id("optimade:S.a%2Eb.c").parent == "S.a%2Eb"
+    assert parse_element_id("bammd:S.a%2Eb.c").parent == "S.a%2Eb"
 
 
 # --- "two elements with the same leaf name under different parents get
@@ -164,7 +162,9 @@ def test_same_leaf_name_under_different_parents_differs() -> None:
 
 
 def test_same_qualified_name_under_different_sources_differs() -> None:
-    assert element_id("nomadsim", ["Run", "energy"]) != element_id("emmet", ["Run", "energy"])
+    assert element_id("nomadsim", ["Run", "energy"]) != element_id(
+        "bammd", ["Run", "energy"]
+    )
 
 
 # --- "a qualified name containing an index is rejected with a message,
@@ -191,7 +191,7 @@ def test_an_index_is_rejected_with_a_message(qualified_name: str, offending: str
 
 def test_an_index_is_rejected_from_segments_too() -> None:
     with pytest.raises(QualifiedNameError):
-        element_id("emmet", ["TaskDocument", "calcs_reversed[0]", "energy"])
+        element_id("bammd", ["Experiment", "steps[0]", "energy"])
 
 
 def test_an_empty_segment_is_rejected() -> None:
@@ -213,7 +213,7 @@ def test_a_stray_percent_is_rejected_rather_than_repaired() -> None:
     assert "position" in str(excinfo.value)
     # Lower case is not the canonical escape, so it is not silently accepted.
     with pytest.raises(QualifiedNameError):
-        element_id("optimade", "Structure.a%2eb")
+        element_id("bammd", "Sample.a%2eb")
 
 
 def test_a_string_without_a_prefix_is_not_an_element_id() -> None:

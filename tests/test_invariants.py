@@ -94,7 +94,7 @@ def test_no_threshold_constant_survives(threshold: str) -> None:
 # --- decision 8: no source package in the app's import graph -----------------
 
 
-@pytest.mark.parametrize("package", ["nomad", "emmet", "bam_masterdata", "optimade"])
+@pytest.mark.parametrize("package", ["nomad", "bam_masterdata"])
 def test_no_source_package_is_imported(package: str) -> None:
     hits = [
         hit for hit in _grep(f"import {package}") if not hit.startswith("tests/test_invariants.py")

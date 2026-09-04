@@ -59,8 +59,6 @@ class Source(StrEnum):
 
     NOMAD_SIMULATION = "nomadsim"
     NOMAD_MEASUREMENT = "nomadmeas"
-    EMMET = "emmet"
-    OPTIMADE = "optimade"
     BAM_MASTERDATA = "bammd"
     PMDCO = "pmdco"
     SCHEMATERIAL = "smat"
