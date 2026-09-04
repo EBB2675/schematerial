@@ -21,7 +21,8 @@ from schematerial.identity import (
     parse_element_id,
     snapshot_index,
 )
-from schematerial.models.schema import Entity, SchemaField, SchemaModel, SemanticType
+from schematerial.models.schema import Entity, SchemaField, SchemaModel
+from schematerial.semantics import semantic_types
 
 
 def _schema() -> SchemaModel:
@@ -39,14 +40,14 @@ def _schema() -> SchemaModel:
                         label="energy_total",
                         datatype="float",
                         unit="J",
-                        semantic_type=SemanticType.ENERGY,
+                        semantic_type=semantic_types.ENERGY,
                     ),
                     SchemaField(
                         path="Run.system.atoms.positions",
                         label="atom_positions",
                         datatype="float",
                         unit="m",
-                        semantic_type=SemanticType.ATOMIC_POSITION,
+                        semantic_type=semantic_types.ATOMIC_POSITION,
                     ),
                     SchemaField(
                         path="Run.calculation.positions",
@@ -264,7 +265,7 @@ def test_snapshot_index_captures_every_element() -> None:
     assert energy.parent == "Run.calculation.energy.total"
     assert energy.range == "float"
     assert energy.unit == "J"
-    assert energy.semantic_type == "energy"
+    assert energy.semantic_type == "quantitykind:Energy"
     assert energy.source_version == "1.0"
 
     assert index["nomadsim:Run"].parent is None
@@ -317,7 +318,7 @@ _STABILITY_SCRIPT = textwrap.dedent(
     import json
 
     from schematerial.identity import Source, snapshot_index
-    from schematerial.models.schema import Entity, SchemaField, SchemaModel, SemanticType
+    from schematerial.models.schema import Entity, SchemaField, SchemaModel
 
     model = SchemaModel(
         name="inline",

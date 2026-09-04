@@ -27,7 +27,7 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict
 
-from schematerial.models.schema import Entity, SchemaModel, SemanticType
+from schematerial.models.schema import Entity, SchemaModel
 
 __all__ = [
     "PREFIXES",
@@ -270,16 +270,16 @@ def capture_snapshot(
     )
 
 
-def _semantic_type_curie(value: SemanticType | str | None) -> str | None:
+def _semantic_type_curie(value: str | None) -> str | None:
     """Decision 4: a facet with no value is absent, not guessed.
 
-    The prototype's ``UNKNOWN`` is not a semantic type, it is the absence of
-    one, so it is dropped rather than recorded. Anything else is carried across
-    verbatim; turning the remaining aliases into real CURIEs is Card 2's job.
+    The value space is open, so anything the source states is carried verbatim.
+    The prototype's `unknown` was never a semantic type -- it was the absence of
+    one -- so it is dropped rather than recorded as a CURIE.
     """
-    if value is None or value == SemanticType.UNKNOWN:
+    if value is None or value == "unknown":
         return None
-    return str(value)
+    return value
 
 
 def _walk(model: SchemaModel) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:

@@ -23,13 +23,8 @@ from pathlib import Path
 
 import yaml
 
-from schematerial.models.schema import (
-    CoordinateFrame,
-    Entity,
-    SchemaField,
-    SchemaModel,
-    SemanticType,
-)
+from schematerial.models.schema import CoordinateFrame, Entity, SchemaField, SchemaModel
+from schematerial.semantics import semantic_types
 
 
 def _parse_dtype(raw: str | None) -> tuple[str, list[int | None] | None]:
@@ -56,53 +51,45 @@ def _parse_dtype(raw: str | None) -> tuple[str, list[int | None] | None]:
     return base, shape
 
 
-def _infer_semantic_type(name: str, path: str, description: str | None) -> SemanticType:
-    """Keyword heuristic over the combined name + path + description text."""
+def _infer_semantic_type(name: str, path: str, description: str | None) -> str | None:
+    """Keyword heuristic over the combined name + path + description text.
+
+    Returns a CURIE, or None where nothing resolves. This ladder is on borrowed
+    time: decision 4 says inferring a semantic type is a separate, scored step,
+    and Card 14 owns it. It survives here only because it is the sole producer
+    today, retargeted onto real CURIEs.
+
+    Six of the prototype's sixteen categories return None rather than a term.
+    `lattice_parameter` and `k_point` have no single term that is both exact and
+    stably addressable; `identifier`, `label` and `flag` are not quantity kinds
+    at all, they are datatype and role hints; `unknown` is the absence of a
+    semantic type, not a value for one. See decision record 002.
+    """
     text = f"{name} {path} {description or ''}".lower()
 
     # Most specific first to avoid false positives
     if "band_gap" in text or "bandgap" in text or "band gap" in text:
-        return SemanticType.BANDGAP
+        return semantic_types.BAND_GAP
     if "energy" in text:
-        return SemanticType.ENERGY
+        return semantic_types.ENERGY
     if "force" in text:
-        return SemanticType.FORCE
+        return semantic_types.FORCE
     if "stress" in text:
-        return SemanticType.STRESS
+        return semantic_types.STRESS
     if "charge" in text:
-        return SemanticType.CHARGE
+        return semantic_types.CHARGE
     if "spin" in text or "magnetic" in text:
-        return SemanticType.SPIN
+        return semantic_types.SPIN
     if "temperature" in text:
-        return SemanticType.TEMPERATURE
+        return semantic_types.TEMPERATURE
     if "pressure" in text:
-        return SemanticType.PRESSURE
-    if "k_point" in text or "kpoint" in text or "k-point" in text:
-        return SemanticType.KPOINT
+        return semantic_types.PRESSURE
     if "position" in text and ("atom" in text or "site" in text or "cartesian" in text):
-        return SemanticType.ATOMIC_POSITION
-    if (
-        "cell_length" in text
-        or "cell_angle" in text
-        or ("lattice" in text and ("vector" in text or "matrix" in text or "param" in text))
-    ):
-        return SemanticType.LATTICE_PARAMETER
+        return semantic_types.ATOMIC_POSITION
     if "length" in text:
-        return SemanticType.LENGTH
-    if "periodic" in text or "dimension_type" in text:
-        return SemanticType.FLAG
-    if (
-        "formula" in text
-        or "composition" in text
-        or "chemical" in text
-        or "n_atom" in text
-        or "nsites" in text
-    ):
-        return SemanticType.IDENTIFIER
-    if "label" in text or "species" in text:
-        return SemanticType.LABEL
+        return semantic_types.LENGTH
 
-    return SemanticType.UNKNOWN
+    return None
 
 
 def _detect_per_atom(name: str, unit: str | None) -> bool:
