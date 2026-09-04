@@ -1,15 +1,16 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from schematerial.models.schema import SchemaModel
+from linkml_runtime.linkml_model.meta import SchemaDefinition
+
 from schematerial.semantics.ontology import OntologyModel
 
 
 @runtime_checkable
 class Parser(Protocol):
-    """Converts a schema source file into the internal SchemaModel IR."""
+    """Converts a schema source file into the canonical LinkML SchemaDefinition."""
 
-    def parse(self, source: str | Path) -> SchemaModel: ...
+    def parse(self, source: str | Path) -> SchemaDefinition: ...
 
 
 @runtime_checkable

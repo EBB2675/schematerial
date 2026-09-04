@@ -52,18 +52,12 @@ def test_json_fixture_loads(name: str) -> None:
 
 
 def test_models_instantiate() -> None:
-    from schematerial.models import SchemaModel
+    from schematerial.models import CoordinateFrame, MaterialsFacets
     from schematerial.semantics import semantic_types
 
-    schema = SchemaModel(name="test")
-    assert schema.name == "test"
-
-    from schematerial.models import Entity, SchemaField
-
-    field = SchemaField(
-        path="Run.calculation.energy.total.value",
-        label="energy_total",
+    facets = MaterialsFacets(
         semantic_type=semantic_types.ENERGY,
+        coordinate_frame=CoordinateFrame.cartesian,
     )
-    assert field.semantic_type == "quantitykind:Energy"
-    assert Entity(name="Run", fields=[field]).fields[0] is field
+    assert facets.semantic_type == "quantitykind:Energy"
+    assert facets.per_atom is None

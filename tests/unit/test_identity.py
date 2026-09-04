@@ -6,12 +6,14 @@ import sys
 import textwrap
 
 import pytest
+from linkml_runtime.linkml_model.meta import ClassDefinition, SchemaDefinition, SlotDefinition
 
+from schematerial._linkml import add_attribute, add_class
+from schematerial.facets import write_facets
 from schematerial.identity import (
     PREFIXES,
     ElementIdError,
     ElementSnapshot,
-    IdentityError,
     QualifiedNameError,
     Source,
     UnknownPrefixError,
@@ -21,43 +23,55 @@ from schematerial.identity import (
     parse_element_id,
     snapshot_index,
 )
-from schematerial.models.schema import Entity, SchemaField, SchemaModel
+from schematerial.models import MaterialsFacets
 from schematerial.semantics import semantic_types
 
 
-def _schema() -> SchemaModel:
-    """A small inline schema written as schema paths, not instance paths."""
-    return SchemaModel(
-        name="inline",
-        version="1.0",
-        format="test",
-        entities=[
-            Entity(
-                name="Run",
-                fields=[
-                    SchemaField(
-                        path="Run.calculation.energy.total.value",
-                        label="energy_total",
-                        datatype="float",
-                        unit="J",
-                        semantic_type=semantic_types.ENERGY,
-                    ),
-                    SchemaField(
-                        path="Run.system.atoms.positions",
-                        label="atom_positions",
-                        datatype="float",
-                        unit="m",
-                        semantic_type=semantic_types.ATOMIC_POSITION,
-                    ),
-                    SchemaField(
-                        path="Run.calculation.positions",
-                        label="calc_positions",
-                        datatype="float",
-                    ),
-                ],
-            )
-        ],
+def _attribute(
+    name: str,
+    *,
+    range: str | None = None,
+    unit: str | None = None,
+    semantic_type: str | None = None,
+) -> SlotDefinition:
+    from linkml_runtime.linkml_model.meta import UnitOfMeasure
+
+    attribute = SlotDefinition(name=name, range=range)
+    if unit is not None:
+        attribute.unit = UnitOfMeasure(ucum_code=unit)
+    write_facets(attribute, MaterialsFacets(semantic_type=semantic_type))
+    return attribute
+
+
+def _inline(*classes: ClassDefinition, version: str | None = "1.0") -> SchemaDefinition:
+    schema = SchemaDefinition(id="https://example.org/inline", name="inline", version=version)
+    for definition in classes:
+        add_class(schema, definition)
+    return schema
+
+
+def _schema() -> SchemaDefinition:
+    """A small inline schema. Nesting is a slot whose range is a class."""
+    run = ClassDefinition(name="Run", tree_root=True)
+    add_attribute(run, SlotDefinition(name="calculation", range="Calculation"))
+    add_attribute(run, SlotDefinition(name="system", range="System"))
+
+    calculation = ClassDefinition(name="Calculation")
+    add_attribute(
+        calculation,
+        _attribute("energy", range="float", unit="J", semantic_type=semantic_types.ENERGY),
     )
+    add_attribute(calculation, _attribute("positions", range="float"))
+
+    system = ClassDefinition(name="System")
+    add_attribute(
+        system,
+        _attribute(
+            "positions", range="float", unit="m", semantic_type=semantic_types.ATOMIC_POSITION
+        ),
+    )
+
+    return _inline(run, calculation, system)
 
 
 # --- the prefix map, decision 1 ----------------------------------------------
@@ -255,14 +269,16 @@ def test_snapshot_index_captures_every_element() -> None:
 
     assert set(index) == {
         "nomadsim:Run",
-        "nomadsim:Run.calculation.energy.total.value",
-        "nomadsim:Run.system.atoms.positions",
+        "nomadsim:Run.calculation",
+        "nomadsim:Run.calculation.energy",
         "nomadsim:Run.calculation.positions",
+        "nomadsim:Run.system",
+        "nomadsim:Run.system.positions",
     }
 
-    energy = index["nomadsim:Run.calculation.energy.total.value"]
-    assert energy.name == "value"
-    assert energy.parent == "Run.calculation.energy.total"
+    energy = index["nomadsim:Run.calculation.energy"]
+    assert energy.name == "energy"
+    assert energy.parent == "Run.calculation"
     assert energy.range == "float"
     assert energy.unit == "J"
     assert energy.semantic_type == "quantitykind:Energy"
@@ -279,36 +295,33 @@ def test_an_unstated_semantic_type_is_absent_not_unknown() -> None:
 
 def test_snapshot_index_rejects_the_prototype_instance_paths() -> None:
     """The fixture schemas still key on instance paths; Card 11 resolves them."""
-    model = SchemaModel(
-        name="prototype",
-        entities=[
-            Entity(
-                name="root",
-                fields=[SchemaField(path="run[0].calculation[-1].energy.total.value", label="e")],
-            )
-        ],
-    )
+    root = ClassDefinition(name="root", tree_root=True)
+    add_attribute(root, SlotDefinition(name="run[0]", range="float"))
     with pytest.raises(QualifiedNameError) as excinfo:
-        snapshot_index(model, Source.NOMAD_SIMULATION)
+        snapshot_index(_inline(root), Source.NOMAD_SIMULATION)
     assert "run[0]" in str(excinfo.value)
 
 
-def test_two_elements_cannot_share_one_id() -> None:
-    model = SchemaModel(
-        name="collision",
-        entities=[
-            Entity(
-                name="Run",
-                fields=[
-                    SchemaField(path="Run.energy", label="a"),
-                    SchemaField(path="Run.energy", label="b"),
-                ],
-            )
-        ],
-    )
-    with pytest.raises(IdentityError) as excinfo:
-        snapshot_index(model, Source.NOMAD_SIMULATION)
-    assert "nomadsim:Run.energy" in str(excinfo.value)
+def test_one_class_reached_by_two_paths_gets_two_ids() -> None:
+    """A class is a type, an element is a place. The same class reached down two
+    different paths is two elements, and decision 1 gives them two ids."""
+    run = ClassDefinition(name="Run", tree_root=True)
+    add_attribute(run, SlotDefinition(name="initial", range="System"))
+    add_attribute(run, SlotDefinition(name="final", range="System"))
+    system = ClassDefinition(name="System")
+    add_attribute(system, SlotDefinition(name="positions", range="float"))
+
+    index = snapshot_index(_inline(run, system), Source.NOMAD_SIMULATION)
+    assert "nomadsim:Run.initial.positions" in index
+    assert "nomadsim:Run.final.positions" in index
+
+
+def test_a_self_referential_schema_terminates() -> None:
+    """A section that contains itself is legal and must not walk forever."""
+    run = ClassDefinition(name="Run", tree_root=True)
+    add_attribute(run, SlotDefinition(name="child", range="Run"))
+    index = snapshot_index(_inline(run), Source.NOMAD_SIMULATION)
+    assert set(index) == {"nomadsim:Run", "nomadsim:Run.child"}
 
 
 # --- "ids are stable across two runs on identical input" ---------------------
@@ -317,24 +330,25 @@ _STABILITY_SCRIPT = textwrap.dedent(
     """
     import json
 
-    from schematerial.identity import Source, snapshot_index
-    from schematerial.models.schema import Entity, SchemaField, SchemaModel
-
-    model = SchemaModel(
-        name="inline",
-        version="1.0",
-        entities=[
-            Entity(
-                name="Run",
-                fields=[
-                    SchemaField(path="Run.calculation.energy.total.value", label="e", unit="J"),
-                    SchemaField(path="Run.system.atoms.positions", label="p", unit="m"),
-                    SchemaField(path="Run.system.chemical_formula%2Ereduced", label="f"),
-                ],
-            )
-        ],
+    from linkml_runtime.linkml_model.meta import (
+        ClassDefinition,
+        SchemaDefinition,
+        SlotDefinition,
     )
-    index = snapshot_index(model, Source.NOMAD_SIMULATION)
+
+    from schematerial.identity import Source, snapshot_index
+
+    run = ClassDefinition(name="Run", tree_root=True)
+    for name, range_ in [
+        ("energy", "float"),
+        ("positions", "float"),
+        ("chemical_formula%2Ereduced", "string"),
+    ]:
+        run.attributes[name] = SlotDefinition(name=name, range=range_)
+    schema = SchemaDefinition(id="https://example.org/i", name="inline", version="1.0")
+    schema.classes["Run"] = run
+
+    index = snapshot_index(schema, Source.NOMAD_SIMULATION)
     print(json.dumps({k: v.model_dump() for k, v in index.items()}, sort_keys=True))
     """
 )
@@ -355,7 +369,7 @@ def test_ids_are_stable_across_two_runs_on_identical_input() -> None:
     first = _run_in_subprocess("0")
     second = _run_in_subprocess("1")
     assert first == second
-    assert "nomadsim:Run.calculation.energy.total.value" in json.loads(first)
+    assert "nomadsim:Run.energy" in json.loads(first)
 
 
 def test_ids_are_stable_within_a_process() -> None:

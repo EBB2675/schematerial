@@ -1,0 +1,104 @@
+id: https://w3id.org/schematerial/core
+name: schematerial_core
+title: schematerial canonical core
+description: >-
+  The metamodel extension that makes a LinkML schema carry materials-science
+  facets.
+
+
+  The canonical representation of a source model is a plain LinkML
+  SchemaDefinition: sections become classes, quantities become class-local
+  attributes, a unit is written as a ucum_code, a repeat is multivalued. None of
+  that needs redefining here, and this schema does not redefine it.
+
+
+  What LinkML has no room for is the five facets of decision 4. Assigning a
+  non-metamodel slot to a schema element is an error, and there is no way to add
+  slots to SlotDefinition, so the facets live in `annotations` and this class is
+  what governs them. An element carrying facets points at it through
+  `instantiates`, which is how a reader knows the annotations are these
+  annotations and not somebody else's.
+
+
+  A facet with no value is absent. Every slot below is optional and none has a
+  default, because a default would be a guess and decision 4 forbids guessing.
+
+license: https://spdx.org/licenses/MIT.html
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  smat: https://w3id.org/schematerial/core/
+  qudt: http://qudt.org/schema/qudt/
+  quantitykind: http://qudt.org/vocab/quantitykind/
+  emmo: https://w3id.org/emmo#
+  pmdco: https://w3id.org/pmd/co/
+
+default_prefix: smat
+default_range: string
+
+imports:
+  - linkml:types
+
+classes:
+  MaterialsFacets:
+    class_uri: smat:MaterialsFacets
+    description: >-
+      The facets an element may carry, as annotations. Referenced from an
+      element through `instantiates`.
+    attributes:
+      semantic_type:
+        slot_uri: smat:semantic_type
+        range: uriorcurie
+        required: false
+        description: >-
+          What the element measures, as a CURIE into QUDT, EMMO or PMDco. Open:
+          the value space is those vocabularies, never a local enum. Absent
+          unless the source states one or a human has accepted a grounding.
+
+      coordinate_frame:
+        slot_uri: smat:coordinate_frame
+        range: CoordinateFrame
+        required: false
+        description: >-
+          The frame a vector quantity is expressed in. Absent for a quantity
+          that has no frame, rather than a "none" member, because absent is
+          what "no frame" means.
+
+      per_atom:
+        slot_uri: smat:per_atom
+        range: boolean
+        required: false
+        description: >-
+          True when the value is already divided by the number of atoms. Absent
+          when the source does not say, which is not the same as false.
+
+      spin_channel:
+        slot_uri: smat:spin_channel
+        range: integer
+        required: false
+        description: >-
+          Which spin channel the value belongs to, when it is resolved by one.
+          Absent for a spin-summed quantity.
+
+      unit_normalized:
+        slot_uri: smat:unit_normalized
+        range: string
+        required: false
+        description: >-
+          The UCUM code the element's stated unit normalises to. The raw unit
+          stays where the source put it; this is the normalised form, and it is
+          absent when normalisation was not possible.
+
+enums:
+  CoordinateFrame:
+    enum_uri: smat:CoordinateFrame
+    description: >-
+      The frame a vector quantity is expressed in. There is no "none" member:
+      an element with no frame carries no coordinate_frame facet.
+    permissible_values:
+      cartesian:
+        description: Cartesian coordinates, in the units of the element.
+      fractional:
+        description: Fractional coordinates of the lattice vectors.
+      reciprocal:
+        description: Coordinates in reciprocal space.
