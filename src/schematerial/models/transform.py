@@ -3,8 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-class TransformOp(BaseModel):
-    ...
+class TransformOp(BaseModel): ...
 
 
 class UnitConversionOp(TransformOp):

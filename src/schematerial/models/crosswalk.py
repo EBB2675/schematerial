@@ -29,8 +29,8 @@ class MappingRelation(StrEnum):
 
 
 class MappingStatus(StrEnum):
-    AUTO_ACCEPTED = "auto_accepted"      # score >= 0.85
-    NEEDS_REVIEW = "needs_review"        # 0.40 <= score < 0.85
+    AUTO_ACCEPTED = "auto_accepted"  # score >= 0.85
+    NEEDS_REVIEW = "needs_review"  # 0.40 <= score < 0.85
     LIKELY_NO_MATCH = "likely_no_match"  # score < 0.40
 
 

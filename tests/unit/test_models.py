@@ -28,9 +28,22 @@ def test_semantic_type_is_str() -> None:
 
 def test_semantic_type_all_values() -> None:
     expected = {
-        "energy", "length", "force", "stress", "charge", "spin",
-        "temperature", "pressure", "band_gap", "k_point", "atomic_position",
-        "lattice_parameter", "identifier", "label", "flag", "unknown",
+        "energy",
+        "length",
+        "force",
+        "stress",
+        "charge",
+        "spin",
+        "temperature",
+        "pressure",
+        "band_gap",
+        "k_point",
+        "atomic_position",
+        "lattice_parameter",
+        "identifier",
+        "label",
+        "flag",
+        "unknown",
     }
     assert {v.value for v in SemanticType} == expected
 
@@ -226,9 +239,7 @@ def test_mapping_candidate_status_derived_from_score() -> None:
 
 
 def test_mapping_candidate_no_score_keeps_default_status() -> None:
-    c = MappingCandidate(
-        source_field="a", target_field="b", relation=MappingRelation.EXACT
-    )
+    c = MappingCandidate(source_field="a", target_field="b", relation=MappingRelation.EXACT)
     assert c.status == MappingStatus.NEEDS_REVIEW
 
 
