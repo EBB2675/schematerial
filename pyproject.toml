@@ -4,12 +4,17 @@ version = "0.0.0"
 description = "Semantic crosswalk compiler for materials-science data models"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "linkml==1.11.1",
+    "linkml-map==0.5.2",
+    "linkml-runtime==1.11.1",
     "pydantic>=2.0",
     "pyyaml>=6.0",
+    "sssom==0.4.21",
 ]
 
 [project.scripts]
 schematerial = "schematerial.cli:main"
+schematerial-schema = "schematerial.schema.generate:main"
 
 [dependency-groups]
 dev = [
@@ -30,6 +35,9 @@ testpaths = ["tests"]
 
 [tool.ruff]
 src = ["src"]
+# models/ is generated output. Formatting it would make the tree disagree with
+# what `uv run schematerial-schema` produces, which is a Card 3 invariant.
+extend-exclude = ["src/schematerial/models"]
 line-length = 100
 target-version = "py312"
 

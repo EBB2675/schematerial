@@ -1,60 +1,71 @@
-"""The models that survive Card 2, and the shape they survive in."""
+"""The generated model, and the facets it defines. Card 3."""
+
+import importlib
 
 import pytest
+from linkml_runtime.linkml_model.meta import ClassDefinition, SchemaDefinition, SlotDefinition
 from pydantic import ValidationError
 
-from schematerial.models.schema import CoordinateFrame, Entity, SchemaField, SchemaModel
+from schematerial.models import (
+    CoordinateFrame,
+    Entity,
+    MaterialsFacets,
+    SchemaField,
+    SchemaModel,
+)
 from schematerial.semantics import semantic_types
 from schematerial.semantics.ontology import OntologyConcept, OntologyModel, OntologyTerm
 
-# --- semantic type: an open uriorcurie, not an enum (decision 4) -------------
+# --- the facets of decision 4 ------------------------------------------------
 
 
-def test_semantic_type_is_absent_by_default() -> None:
-    """A facet with no value is absent, not guessed, and not 'unknown'."""
-    f = SchemaField(path="Run.energy", label="energy")
-    assert f.semantic_type is None
+def test_card_2_core_concepts_are_linkml_metamodel_aliases() -> None:
+    """The old wrappers survive without creating a second canonical model."""
+    assert SchemaModel is SchemaDefinition
+    assert Entity is ClassDefinition
+    assert SchemaField is SlotDefinition
+
+
+def test_the_model_defines_exactly_the_five_facets() -> None:
+    assert set(MaterialsFacets.model_fields) == {
+        "semantic_type",
+        "coordinate_frame",
+        "per_atom",
+        "spin_channel",
+        "unit_normalized",
+    }
+
+
+def test_every_facet_is_absent_by_default() -> None:
+    """A facet with no value is absent, not guessed. No facet has a default."""
+    facets = MaterialsFacets()
+    for name in MaterialsFacets.model_fields:
+        assert getattr(facets, name) is None, f"{name} has a default, which is a guess"
+
+
+def test_coordinate_frame_has_no_none_member() -> None:
+    """An element with no frame carries no facet, so 'none' is not a value."""
+    assert {member.value for member in CoordinateFrame} == {
+        "cartesian",
+        "fractional",
+        "reciprocal",
+    }
+
+
+# --- semantic type: an open uriorcurie, not an enum --------------------------
 
 
 def test_an_unrecognised_semantic_type_is_preserved_verbatim() -> None:
-    """The value space is the vocabularies, not a local enum."""
     exotic = "emmo:EMMO_6074aa9d_7c3b_4011_b45a_4e7cde6f5f39"
-    f = SchemaField(path="Run.k_point", label="k_point", semantic_type=exotic)
-    assert f.semantic_type == exotic
-    assert SchemaField.model_validate_json(f.model_dump_json()).semantic_type == exotic
+    facets = MaterialsFacets(semantic_type=exotic)
+    assert facets.semantic_type == exotic
+    assert MaterialsFacets.model_validate_json(facets.model_dump_json()).semantic_type == exotic
     assert semantic_types.resolve_alias(exotic) == exotic
 
 
-def test_an_unrecognised_semantic_type_survives_snapshot_capture() -> None:
-    from schematerial.identity import Source, snapshot_index
-
-    exotic = "pmdco:SomeTermNobodyHasHeardOf"
-    model = SchemaModel(
-        name="m",
-        entities=[
-            Entity(
-                name="Run",
-                fields=[SchemaField(path="Run.x", label="x", semantic_type=exotic)],
-            )
-        ],
-    )
-    index = snapshot_index(model, Source.NOMAD_SIMULATION)
-    assert index["nomadsim:Run.x"].semantic_type == exotic
-
-
-def test_the_prototype_unknown_is_not_a_semantic_type() -> None:
-    from schematerial.identity import Source, snapshot_index
-
-    model = SchemaModel(
-        name="m",
-        entities=[
-            Entity(
-                name="Run",
-                fields=[SchemaField(path="Run.x", label="x", semantic_type="unknown")],
-            )
-        ],
-    )
-    assert snapshot_index(model, Source.NOMAD_SIMULATION)["nomadsim:Run.x"].semantic_type is None
+def test_a_bad_coordinate_frame_is_rejected_by_the_generated_model() -> None:
+    with pytest.raises(ValidationError):
+        MaterialsFacets(coordinate_frame="spherical")  # type: ignore[arg-type]
 
 
 # --- the alias table ---------------------------------------------------------
@@ -85,69 +96,16 @@ def test_the_alias_table_is_not_mutable() -> None:
         semantic_types.SEMANTIC_TYPE_ALIASES["energy"] = "nope"  # type: ignore[index]
 
 
-# --- no vector data in the core IR (decision 10) -----------------------------
+# --- no vector data in the core (decision 10) --------------------------------
 
 
-def test_a_schema_field_has_no_embedding_field() -> None:
-    assert "embedding" not in SchemaField.model_fields
-    with pytest.raises(ValidationError):
-        SchemaField(path="Run.x", label="x", embedding=[0.1, 0.2])  # type: ignore[call-arg]
+def test_the_core_carries_no_vector_field() -> None:
+    assert "embedding" not in MaterialsFacets.model_fields
+    dumped = MaterialsFacets(semantic_type="quantitykind:Energy").model_dump()
+    assert not any(isinstance(value, list) for value in dumped.values())
 
 
-def test_serialising_an_element_produces_no_vector_data() -> None:
-    f = SchemaField(path="Run.energy", label="energy", unit="J", examples=[1.0, 2.0])
-    dumped = f.model_dump()
-    vector_like = {
-        key: value
-        for key, value in dumped.items()
-        if key != "examples"
-        and isinstance(value, list)
-        and value
-        and all(isinstance(item, float) for item in value)
-    }
-    assert vector_like == {}
-
-
-def test_a_schema_field_carries_no_ontology_terms() -> None:
-    """A grounding proposal is Card 14's output, never a field on an element."""
-    assert "ontology_terms" not in SchemaField.model_fields
-
-
-# --- what survives -----------------------------------------------------------
-
-
-def test_schema_field_defaults() -> None:
-    f = SchemaField(path="Run.energy", label="energy")
-    assert f.datatype == "unknown"
-    assert f.shape is None
-    assert f.cardinality == "one"
-    assert f.coordinate_frame == CoordinateFrame.NONE
-    assert f.per_atom is False
-    assert f.spin_channel is None
-
-
-def test_schema_model_round_trips() -> None:
-    model = SchemaModel(
-        name="NOMAD",
-        version="1.0",
-        format="nomad",
-        entities=[
-            Entity(
-                name="Run",
-                parent="Base",
-                fields=[
-                    SchemaField(
-                        path="Run.calculation.energy.total.value",
-                        label="energy_total",
-                        datatype="float",
-                        unit="J",
-                        semantic_type=semantic_types.ENERGY,
-                    )
-                ],
-            )
-        ],
-    )
-    assert SchemaModel.model_validate_json(model.model_dump_json()) == model
+# --- ontology records stay app records ---------------------------------------
 
 
 def test_ontology_records_survive_as_app_records() -> None:
@@ -163,18 +121,7 @@ def test_ontology_records_survive_as_app_records() -> None:
     assert model.concepts[0].uri == term.uri
 
 
-def test_ontology_records_are_not_importable_from_models() -> None:
-    """models/ becomes generated output in Card 3; app records live elsewhere."""
-    import importlib
-
-    import schematerial.models as models
-
-    assert not hasattr(models, "OntologyTerm")
-    with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("schematerial.models.ontology")
-
-
-# --- the deleted models are gone (Card 2's deletion list) --------------------
+# --- the retired and deleted modules -----------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -184,14 +131,10 @@ def test_ontology_records_are_not_importable_from_models() -> None:
         "schematerial.models.crosswalk",
         "schematerial.models.alignment",
         "schematerial.models.annotation",
+        "schematerial.models.ontology",
+        "schematerial.models.schema",
     ],
 )
-def test_the_deleted_modules_are_gone(module: str) -> None:
-    import importlib
-
+def test_the_retired_modules_are_gone(module: str) -> None:
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module(module)
-
-
-# The names themselves are asserted absent in tests/test_invariants.py, which
-# greps the tree. Naming them here would put them back in it.

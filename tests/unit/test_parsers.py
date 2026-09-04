@@ -1,9 +1,15 @@
+import ast
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from linkml_runtime.linkml_model.meta import SchemaDefinition, UnitOfMeasure
 
-from schematerial.models.schema import CoordinateFrame, SchemaField, SchemaModel
+from schematerial._linkml import attributes_of, class_of
+from schematerial.facets import read_facets
+from schematerial.models import CoordinateFrame
 from schematerial.parsers._yaml_base import (
+    ROOT_CLASS,
     _detect_per_atom,
     _infer_semantic_type,
     _parse_dtype,
@@ -21,15 +27,57 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 # --- helpers ---
 
 
-def _fields(schema: SchemaModel) -> list[SchemaField]:
-    return schema.entities[0].fields
+@dataclass(frozen=True)
+class _View:
+    """A canonical element, read the way a caller reads one.
+
+    The parsers now emit a LinkML SchemaDefinition, so a "field" is a
+    class-local attribute, its type is a `range`, its unit is a `ucum_code`,
+    and its facets are annotations under `instantiates`. This view exists so
+    the assertions below say what they mean rather than walking LinkML by hand.
+    """
+
+    name: str
+    path: str | None
+    range: str | None
+    unit: str | None
+    multivalued: bool
+    shape: list[str | int] | None
+    semantic_type: str | None
+    coordinate_frame: CoordinateFrame | None
+    per_atom: bool | None
 
 
-def _get(schema: SchemaModel, label: str) -> SchemaField:
-    for f in _fields(schema):
-        if f.label == label:
-            return f
-    raise KeyError(f"{label!r} not found in schema")
+def _annotation(attribute: object, tag: str) -> str | None:
+    annotations = getattr(attribute, "annotations", None) or {}
+    found = annotations.get(tag)
+    return None if found is None else str(getattr(found, "value", found))
+
+
+def _fields(schema: SchemaDefinition) -> list[_View]:
+    return [_get(schema, name) for name in attributes_of(class_of(schema, ROOT_CLASS))]
+
+
+def _get(schema: SchemaDefinition, label: str) -> _View:
+    attributes = attributes_of(class_of(schema, ROOT_CLASS))
+    if label not in attributes:
+        raise KeyError(f"{label!r} not found in schema")
+    attribute = attributes[label]
+    facets = read_facets(attribute)
+    raw_shape = _annotation(attribute, "source_shape")
+    unit = attribute.unit
+    unit_code = unit.ucum_code if isinstance(unit, UnitOfMeasure) else None
+    return _View(
+        name=str(attribute.name),
+        path=_annotation(attribute, "source_path_raw"),
+        range=None if attribute.range is None else str(attribute.range),
+        unit=None if unit_code is None else str(unit_code),
+        multivalued=bool(attribute.multivalued),
+        shape=None if raw_shape is None else ast.literal_eval(raw_shape),
+        semantic_type=facets.semantic_type,
+        coordinate_frame=facets.coordinate_frame,
+        per_atom=facets.per_atom,
+    )
 
 
 # --- dtype parsing ---
@@ -137,13 +185,13 @@ def test_infer_generic_length() -> None:
 def test_per_atom_from_unit() -> None:
     assert _detect_per_atom("energy", "eV/atom") is True
     assert _detect_per_atom("energy", "J/atom") is True
-    assert _detect_per_atom("energy", "eV") is False
+    assert _detect_per_atom("energy", "eV") is None
 
 
 def test_per_atom_from_name() -> None:
     assert _detect_per_atom("energy_total_per_atom", "J") is True
     assert _detect_per_atom("energy_per_atom", None) is True
-    assert _detect_per_atom("energy_total", None) is False
+    assert _detect_per_atom("energy_total", None) is None
 
 
 # --- Protocol conformance ---
@@ -159,75 +207,75 @@ def test_parsers_satisfy_protocol() -> None:
 
 
 @pytest.fixture(scope="module")
-def nomad_schema() -> SchemaModel:
+def nomad_schema() -> SchemaDefinition:
     return NomadParser().parse(FIXTURES / "nomad_schema.yaml")
 
 
-def test_nomad_format(nomad_schema: SchemaModel) -> None:
-    assert nomad_schema.format == "nomad"
-    assert nomad_schema.name == "NOMAD Metainfo"
+def test_nomad_format(nomad_schema: SchemaDefinition) -> None:
+    assert nomad_schema.id.endswith("/nomad")
+    assert nomad_schema.title == "NOMAD Metainfo"
     assert nomad_schema.version == "1.0"
 
 
-def test_nomad_field_count(nomad_schema: SchemaModel) -> None:
+def test_nomad_field_count(nomad_schema: SchemaDefinition) -> None:
     assert len(_fields(nomad_schema)) == 10
 
 
-def test_nomad_energy_total(nomad_schema: SchemaModel) -> None:
+def test_nomad_energy_total(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "energy_total")
     assert f.path == "run[0].calculation[-1].energy.total.value"
-    assert f.datatype == "float"
+    assert f.range == "float"
     assert f.unit == "J"
     assert f.semantic_type == semantic_types.ENERGY
-    assert f.per_atom is False
+    assert f.per_atom is None
     assert f.shape is None
-    assert f.cardinality == "one"
+    assert f.multivalued is False
 
 
-def test_nomad_energy_total_per_atom(nomad_schema: SchemaModel) -> None:
+def test_nomad_energy_total_per_atom(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "energy_total_per_atom")
     assert f.per_atom is True
     assert f.semantic_type == semantic_types.ENERGY
 
 
-def test_nomad_band_gap(nomad_schema: SchemaModel) -> None:
+def test_nomad_band_gap(nomad_schema: SchemaDefinition) -> None:
     assert _get(nomad_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
 
 
-def test_nomad_lattice_vectors(nomad_schema: SchemaModel) -> None:
+def test_nomad_lattice_vectors(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "lattice_vectors")
     assert f.semantic_type is None
     assert f.shape == [3, 3]
-    assert f.cardinality == "many"
+    assert f.multivalued is True
 
 
-def test_nomad_atom_positions(nomad_schema: SchemaModel) -> None:
+def test_nomad_atom_positions(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "atom_positions")
     assert f.semantic_type == semantic_types.ATOMIC_POSITION
-    assert f.coordinate_frame == CoordinateFrame.CARTESIAN
-    assert f.shape == [None, 3]
+    assert f.coordinate_frame == CoordinateFrame.cartesian
+    assert f.shape == ["N", 3]
 
 
-def test_nomad_atom_labels(nomad_schema: SchemaModel) -> None:
+def test_nomad_atom_labels(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "atom_labels")
     assert f.semantic_type is None
-    assert f.shape == [None]
+    assert f.shape == ["N"]
 
 
-def test_nomad_periodicity(nomad_schema: SchemaModel) -> None:
+def test_nomad_periodicity(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "periodicity")
     assert f.semantic_type is None
     assert f.shape == [3]
 
 
-def test_nomad_n_atoms(nomad_schema: SchemaModel) -> None:
+def test_nomad_n_atoms(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "n_atoms")
     assert f.semantic_type is None
-    assert f.datatype == "int"
+    assert f.range == "integer"
     assert f.unit is None
 
 
-def test_nomad_source_file(nomad_schema: SchemaModel) -> None:
+def test_nomad_source_file(nomad_schema: SchemaDefinition) -> None:
     assert nomad_schema.source_file is not None
     assert "nomad_schema.yaml" in nomad_schema.source_file
 
@@ -236,64 +284,64 @@ def test_nomad_source_file(nomad_schema: SchemaModel) -> None:
 
 
 @pytest.fixture(scope="module")
-def optimade_schema() -> SchemaModel:
+def optimade_schema() -> SchemaDefinition:
     return OptimadeParser().parse(FIXTURES / "optimade_schema.yaml")
 
 
-def test_optimade_format(optimade_schema: SchemaModel) -> None:
-    assert optimade_schema.format == "optimade"
+def test_optimade_format(optimade_schema: SchemaDefinition) -> None:
+    assert optimade_schema.id.endswith("/optimade")
     assert optimade_schema.name == "OPTIMADE"
     assert optimade_schema.version == "1.2"
 
 
-def test_optimade_field_count(optimade_schema: SchemaModel) -> None:
+def test_optimade_field_count(optimade_schema: SchemaDefinition) -> None:
     assert len(_fields(optimade_schema)) == 11
 
 
-def test_optimade_total_energy(optimade_schema: SchemaModel) -> None:
+def test_optimade_total_energy(optimade_schema: SchemaDefinition) -> None:
     f = _get(optimade_schema, "total_energy")
     assert f.path == "attributes._nomad_total_energy"
     assert f.unit == "eV"
     assert f.semantic_type == semantic_types.ENERGY
-    assert f.per_atom is False
+    assert f.per_atom is None
 
 
-def test_optimade_energy_per_atom(optimade_schema: SchemaModel) -> None:
+def test_optimade_energy_per_atom(optimade_schema: SchemaDefinition) -> None:
     f = _get(optimade_schema, "energy_per_atom")
     assert f.unit == "eV/atom"
     assert f.per_atom is True
     assert f.semantic_type == semantic_types.ENERGY
 
 
-def test_optimade_cartesian_site_positions(optimade_schema: SchemaModel) -> None:
+def test_optimade_cartesian_site_positions(optimade_schema: SchemaDefinition) -> None:
     f = _get(optimade_schema, "cartesian_site_positions")
     assert f.semantic_type == semantic_types.ATOMIC_POSITION
-    assert f.coordinate_frame == CoordinateFrame.CARTESIAN
-    assert f.shape == [None, 3]
+    assert f.coordinate_frame == CoordinateFrame.cartesian
+    assert f.shape == ["N", 3]
 
 
-def test_optimade_lattice_vectors(optimade_schema: SchemaModel) -> None:
+def test_optimade_lattice_vectors(optimade_schema: SchemaDefinition) -> None:
     f = _get(optimade_schema, "lattice_vectors")
     assert f.semantic_type is None
     assert f.shape == [3, 3]
     assert f.unit == "Angstrom"
 
 
-def test_optimade_dimension_types(optimade_schema: SchemaModel) -> None:
+def test_optimade_dimension_types(optimade_schema: SchemaDefinition) -> None:
     f = _get(optimade_schema, "dimension_types")
     assert f.semantic_type is None
     assert f.shape == [3]
 
 
-def test_optimade_nperiodic_dimensions(optimade_schema: SchemaModel) -> None:
+def test_optimade_nperiodic_dimensions(optimade_schema: SchemaDefinition) -> None:
     assert _get(optimade_schema, "nperiodic_dimensions").semantic_type is None
 
 
-def test_optimade_band_gap(optimade_schema: SchemaModel) -> None:
+def test_optimade_band_gap(optimade_schema: SchemaDefinition) -> None:
     assert _get(optimade_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
 
 
-def test_optimade_nsites(optimade_schema: SchemaModel) -> None:
+def test_optimade_nsites(optimade_schema: SchemaDefinition) -> None:
     assert _get(optimade_schema, "nsites").semantic_type is None
 
 
@@ -301,58 +349,58 @@ def test_optimade_nsites(optimade_schema: SchemaModel) -> None:
 
 
 @pytest.fixture(scope="module")
-def emmet_schema() -> SchemaModel:
+def emmet_schema() -> SchemaDefinition:
     return EmmetParser().parse(FIXTURES / "emmet_schema.yaml")
 
 
-def test_emmet_format(emmet_schema: SchemaModel) -> None:
-    assert emmet_schema.format == "emmet"
+def test_emmet_format(emmet_schema: SchemaDefinition) -> None:
+    assert emmet_schema.id.endswith("/emmet")
     assert emmet_schema.name == "Emmet"
     assert emmet_schema.version == "0.84"
 
 
-def test_emmet_field_count(emmet_schema: SchemaModel) -> None:
+def test_emmet_field_count(emmet_schema: SchemaDefinition) -> None:
     assert len(_fields(emmet_schema)) == 8
 
 
-def test_emmet_energy(emmet_schema: SchemaModel) -> None:
+def test_emmet_energy(emmet_schema: SchemaDefinition) -> None:
     f = _get(emmet_schema, "energy")
     assert f.path == "calcs_reversed[0].output.energy"
     assert f.unit == "eV"
     assert f.semantic_type == semantic_types.ENERGY
-    assert f.per_atom is False
+    assert f.per_atom is None
 
 
-def test_emmet_energy_per_atom(emmet_schema: SchemaModel) -> None:
+def test_emmet_energy_per_atom(emmet_schema: SchemaDefinition) -> None:
     f = _get(emmet_schema, "energy_per_atom")
     assert f.per_atom is True
     assert f.semantic_type == semantic_types.ENERGY
     assert f.unit == "eV/atom"
 
 
-def test_emmet_site_positions(emmet_schema: SchemaModel) -> None:
+def test_emmet_site_positions(emmet_schema: SchemaDefinition) -> None:
     f = _get(emmet_schema, "site_positions")
     assert f.semantic_type == semantic_types.ATOMIC_POSITION
-    assert f.coordinate_frame == CoordinateFrame.CARTESIAN
-    assert f.shape == [None, 3]
+    assert f.coordinate_frame == CoordinateFrame.cartesian
+    assert f.shape == ["N", 3]
 
 
-def test_emmet_lattice_matrix(emmet_schema: SchemaModel) -> None:
+def test_emmet_lattice_matrix(emmet_schema: SchemaDefinition) -> None:
     f = _get(emmet_schema, "lattice_matrix")
     assert f.semantic_type is None
     assert f.shape == [3, 3]
     assert f.unit == "Angstrom"
 
 
-def test_emmet_site_labels(emmet_schema: SchemaModel) -> None:
+def test_emmet_site_labels(emmet_schema: SchemaDefinition) -> None:
     assert _get(emmet_schema, "site_labels").semantic_type is None
 
 
-def test_emmet_band_gap(emmet_schema: SchemaModel) -> None:
+def test_emmet_band_gap(emmet_schema: SchemaDefinition) -> None:
     assert _get(emmet_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
 
 
-def test_emmet_nsites(emmet_schema: SchemaModel) -> None:
+def test_emmet_nsites(emmet_schema: SchemaDefinition) -> None:
     assert _get(emmet_schema, "nsites").semantic_type is None
 
 
@@ -361,7 +409,7 @@ def test_emmet_nsites(emmet_schema: SchemaModel) -> None:
 
 def test_parser_accepts_str_path() -> None:
     schema = NomadParser().parse(str(FIXTURES / "nomad_schema.yaml"))
-    assert schema.format == "nomad"
+    assert schema.id.endswith("/nomad")
 
 
 # --- YAML validation ---

@@ -34,9 +34,10 @@ def test_the_index_can_be_built_from_a_mapping() -> None:
 
 def test_the_index_is_the_only_place_a_vector_lives() -> None:
     """The element it describes serialises without it."""
-    from schematerial.models.schema import SchemaField
+    from linkml_runtime.dumpers import yaml_dumper
+    from linkml_runtime.linkml_model.meta import SlotDefinition
 
-    field = SchemaField(path="Run.energy", label="energy")
+    element = SlotDefinition(name="energy", range="float")
     index = EmbeddingIndex({"nomadsim:Run.energy": [0.1, 0.2]})
-    assert "0.1" not in field.model_dump_json()
+    assert "0.1" not in yaml_dumper.dumps(element)
     assert index.get("nomadsim:Run.energy") is not None

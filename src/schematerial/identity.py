@@ -25,9 +25,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 
+from linkml_runtime.linkml_model.meta import ClassDefinition, SchemaDefinition, SlotDefinition
 from pydantic import BaseModel, ConfigDict
 
-from schematerial.models.schema import Entity, SchemaModel
+from schematerial._linkml import attributes_of, classes_of
+from schematerial.facets import read_facets
 
 __all__ = [
     "PREFIXES",
@@ -270,65 +272,92 @@ def capture_snapshot(
     )
 
 
-def _semantic_type_curie(value: str | None) -> str | None:
-    """Decision 4: a facet with no value is absent, not guessed.
+def _roots(schema: SchemaDefinition) -> list[str]:
+    """The top-level classes decision 1's dotted path starts from.
 
-    The value space is open, so anything the source states is carried verbatim.
-    The prototype's `unknown` was never a semantic type -- it was the absence of
-    one -- so it is dropped rather than recorded as a CURIE.
+    An explicit `tree_root` wins. Failing that, a class that is never the range
+    of an attribute is a root: a class reached only through another class is a
+    step on a path, not the start of one. If every class is reachable -- a cycle
+    with no entry point -- every class is treated as a root, because refusing to
+    walk would be worse than walking twice.
     """
-    if value is None or value == "unknown":
-        return None
-    return value
+    classes = {str(name): definition for name, definition in classes_of(schema).items()}
+    declared = [name for name, definition in classes.items() if definition.tree_root]
+    if declared:
+        return sorted(declared)
+
+    ranged: set[str] = set()
+    for definition in classes.values():
+        for attribute in attributes_of(definition).values():
+            if attribute.range is not None and str(attribute.range) in classes:
+                ranged.add(str(attribute.range))
+    roots = sorted(name for name in classes if name not in ranged)
+    return roots or sorted(classes)
 
 
-def _walk(model: SchemaModel) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:
-    for entity in model.entities:
-        yield from _walk_entity(entity, model.version)
-
-
-def _walk_entity(
-    entity: Entity, source_version: str | None
-) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:
-    yield (
-        (entity.name,),
-        capture_snapshot(name=entity.name, source_version=source_version),
+def _snapshot_of(
+    element: ClassDefinition | SlotDefinition,
+    name: str,
+    parent: str | None,
+    source_version: str | None,
+) -> ElementSnapshot:
+    unit = getattr(element, "unit", None)
+    facets = read_facets(element)
+    return capture_snapshot(
+        name=name,
+        parent=parent,
+        range=None if getattr(element, "range", None) is None else str(element.range),
+        unit=None if unit is None else str(unit.ucum_code or "") or None,
+        semantic_type=facets.semantic_type,
+        source_version=source_version,
     )
-    for field in entity.fields:
-        segments = split_qualified_name(field.path)
-        leaf = segments[-1]
-        parent = join_qualified_name(segments[:-1]) if len(segments) > 1 else None
-        yield (
-            segments,
-            capture_snapshot(
-                name=leaf,
-                parent=parent,
-                range=field.datatype,
-                unit=field.unit,
-                semantic_type=_semantic_type_curie(field.semantic_type),
-                source_version=source_version,
-            ),
-        )
 
 
-def snapshot_index(model: SchemaModel, source: str | Source) -> Mapping[str, ElementSnapshot]:
-    """Capture every element of a parsed schema as an id and a snapshot.
+def _walk(schema: SchemaDefinition) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:
+    """Every element, as the segments of its qualified name and its snapshot.
+
+    Nesting is a slot whose range is a class (decision 3 and Card 7), so the
+    walk follows those ranges. A class already on the current path is not
+    followed again: a self-referential schema is legal and must not produce an
+    infinite path.
+    """
+    classes = {str(name): definition for name, definition in classes_of(schema).items()}
+    version = None if schema.version is None else str(schema.version)
+
+    def descend(
+        class_name: str, prefix: tuple[str, ...], seen: frozenset[str]
+    ) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:
+        definition = classes[class_name]
+        for attribute_name, attribute in attributes_of(definition).items():
+            segments = (*prefix, str(attribute_name))
+            parent = join_qualified_name(prefix) if prefix else None
+            yield segments, _snapshot_of(attribute, str(attribute_name), parent, version)
+
+            range_name = None if attribute.range is None else str(attribute.range)
+            if range_name in classes and range_name not in seen:
+                yield from descend(range_name, segments, seen | {range_name})
+
+    for root in _roots(schema):
+        yield (root,), _snapshot_of(classes[root], root, None, version)
+        yield from descend(root, (root,), frozenset({root}))
+
+
+def snapshot_index(schema: SchemaDefinition, source: str | Source) -> Mapping[str, ElementSnapshot]:
+    """Capture every element of a canonical schema as an id and a snapshot.
 
     This is where snapshots are taken: whatever builds elements calls it once on
-    the finished model, so identity and snapshot are decided in one place rather
-    than at every construction site.
+    the finished schema, so identity and snapshot are decided in one place
+    rather than at every construction site.
 
-    Raises :class:`QualifiedNameError` if any element path is an instance path.
-    The prototype's fixture schemas are written that way, and decision 1 does
-    not allow guessing what the index meant; Card 11 resolves them.
+    Raises :class:`QualifiedNameError` if any element name is an instance path.
     """
     prefix = _check_prefix(source)
     index: dict[str, ElementSnapshot] = {}
-    for segments, snapshot in _walk(model):
+    for segments, snapshot in _walk(schema):
         identifier = element_id(prefix, segments)
         if identifier in index:
             raise IdentityError(
-                f"{model.name!r} produces the element id {identifier!r} twice. "
+                f"{schema.name!r} produces the element id {identifier!r} twice. "
                 f"An id is an identity, so two elements cannot share one."
             )
         index[identifier] = snapshot
