@@ -8,17 +8,11 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 YAML_FIXTURES = [
     "nomad_schema.yaml",
-    "optimade_schema.yaml",
-    "emmet_schema.yaml",
     "cif_schema.yaml",
-    "nomad_optimade_gt.yaml",
-    "nomad_emmet_gt.yaml",
 ]
 
 JSON_FIXTURES = [
     "nomad_entry.json",
-    "optimade_entry.json",
-    "emmet_entry.json",
     "cif_entry.json",
 ]
 

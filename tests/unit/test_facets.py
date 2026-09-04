@@ -1,5 +1,7 @@
 """Reading, writing and validating the decision 4 facets."""
 
+from pathlib import Path
+
 import pytest
 from linkml_runtime.linkml_model.meta import ClassDefinition, SchemaDefinition, SlotDefinition
 
@@ -159,14 +161,7 @@ def test_a_non_facet_annotation_is_left_alone() -> None:
 
 
 def test_the_parsers_emit_facets_that_validate() -> None:
-    from schematerial.parsers import EmmetParser, NomadParser, OptimadeParser
+    from schematerial.parsers import NomadParser
 
-    for parser, fixture in (
-        (NomadParser(), "nomad_schema.yaml"),
-        (OptimadeParser(), "optimade_schema.yaml"),
-        (EmmetParser(), "emmet_schema.yaml"),
-    ):
-        from pathlib import Path
-
-        schema = parser.parse(Path(__file__).parent.parent / "fixtures" / fixture)
-        validate_schema_facets(schema)
+    schema = NomadParser().parse(Path(__file__).parent.parent / "fixtures" / "nomad_schema.yaml")
+    validate_schema_facets(schema)

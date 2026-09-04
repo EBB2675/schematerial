@@ -1,7 +1,6 @@
 """Shared parsing logic for all schematerial fixture YAML schemas.
 
-All supported schema fixtures (NOMAD, OPTIMADE, Emmet, CIF) use the same
-top-level structure:
+The prototype schema fixtures use the same top-level structure:
 
     name: "..."
     version: "..."

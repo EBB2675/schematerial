@@ -27,9 +27,9 @@ def test_a_malformed_key_cannot_enter_the_index() -> None:
 
 
 def test_the_index_can_be_built_from_a_mapping() -> None:
-    index = EmbeddingIndex({"emmet:TaskDocument": [1.0, 2.0]})
-    assert index.get("emmet:TaskDocument") == (1.0, 2.0)
-    assert list(index) == ["emmet:TaskDocument"]
+    index = EmbeddingIndex({"bammd:ExperimentalStep": [1.0, 2.0]})
+    assert index.get("bammd:ExperimentalStep") == (1.0, 2.0)
+    assert list(index) == ["bammd:ExperimentalStep"]
 
 
 def test_the_index_is_the_only_place_a_vector_lives() -> None:
