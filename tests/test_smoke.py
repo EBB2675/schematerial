@@ -52,22 +52,18 @@ def test_json_fixture_loads(name: str) -> None:
 
 
 def test_models_instantiate() -> None:
-    from schematerial.models import (
-        AnnotationEntry,
-        MappingCandidate,
-        MappingRelation,
-        SchemaModel,
-    )
+    from schematerial.models import SchemaModel
+    from schematerial.semantics import semantic_types
 
     schema = SchemaModel(name="test")
     assert schema.name == "test"
 
-    candidate = MappingCandidate(
-        source_field="run[0].calculation[-1].energy.total.value",
-        target_field="attributes._nomad_total_energy",
-        relation=MappingRelation.EXACT,
-    )
-    assert candidate.relation == MappingRelation.EXACT
+    from schematerial.models import Entity, SchemaField
 
-    entry = AnnotationEntry(field="run[0].calculation[-1].energy.total.value")
-    assert entry.confidence is None
+    field = SchemaField(
+        path="Run.calculation.energy.total.value",
+        label="energy_total",
+        semantic_type=semantic_types.ENERGY,
+    )
+    assert field.semantic_type == "quantitykind:Energy"
+    assert Entity(name="Run", fields=[field]).fields[0] is field

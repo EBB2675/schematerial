@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from schematerial.models.schema import CoordinateFrame, SchemaField, SchemaModel, SemanticType
+from schematerial.models.schema import CoordinateFrame, SchemaField, SchemaModel
 from schematerial.parsers._yaml_base import (
     _detect_per_atom,
     _infer_semantic_type,
@@ -13,6 +13,7 @@ from schematerial.parsers.base import Parser
 from schematerial.parsers.emmet import EmmetParser
 from schematerial.parsers.nomad import NomadParser
 from schematerial.parsers.optimade import OptimadeParser
+from schematerial.semantics import semantic_types
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
@@ -67,63 +68,67 @@ def test_parse_dtype_unrecognised_token_does_not_crash() -> None:
 
 def test_infer_energy() -> None:
     result = _infer_semantic_type("energy_total", "run.calculation.energy.total", None)
-    assert result == SemanticType.ENERGY
+    assert result == semantic_types.ENERGY
 
 
 def test_infer_bandgap_beats_energy() -> None:
     # "band_gap" must win over "energy" even if both appear in the text
     result = _infer_semantic_type("band_gap", "calculation.band_gap.value", "Electronic band gap.")
-    assert result == SemanticType.BANDGAP
+    assert result == semantic_types.BAND_GAP
 
 
-def test_infer_lattice_parameter() -> None:
+def test_infer_lattice_vectors_have_no_semantic_type() -> None:
+    """`lattice_parameter` covered cell lengths, cell angles and lattice
+    vectors; no single term covers all three. See decision record 002."""
     result = _infer_semantic_type(
         "lattice_vectors", "system.atoms.lattice_vectors", "Bravais lattice vectors."
     )
-    assert result == SemanticType.LATTICE_PARAMETER
+    assert result is None
 
 
 def test_infer_atomic_position() -> None:
     result = _infer_semantic_type(
         "atom_positions", "system.atoms.positions", "Cartesian positions of each atom."
     )
-    assert result == SemanticType.ATOMIC_POSITION
+    assert result == semantic_types.ATOMIC_POSITION
 
 
 def test_infer_flag() -> None:
     result = _infer_semantic_type(
         "periodicity", "system.atoms.periodic", "Periodicity along each direction."
     )
-    assert result == SemanticType.FLAG
+    assert result is None
 
 
 def test_infer_identifier() -> None:
     result = _infer_semantic_type(
         "chemical_composition_reduced", "system.chemical_composition_reduced", None
     )
-    assert result == SemanticType.IDENTIFIER
+    assert result is None
 
 
 def test_infer_label() -> None:
     result = _infer_semantic_type(
         "atom_labels", "system.atoms.labels", "Element symbol for each atom site."
     )
-    assert result == SemanticType.LABEL
+    assert result is None
 
 
-def test_infer_cell_length_is_lattice_parameter() -> None:
+def test_infer_cell_length_is_a_length() -> None:
+    """The prototype called this `lattice_parameter`, which has no term. A cell
+    edge length is a length, and that one does resolve."""
     result = _infer_semantic_type("cell_length_a", "_cell_length_a", "a cell edge length.")
-    assert result == SemanticType.LATTICE_PARAMETER
+    assert result == semantic_types.LENGTH
 
 
-def test_infer_cell_angle_is_lattice_parameter() -> None:
+def test_infer_cell_angle_has_no_semantic_type() -> None:
     result = _infer_semantic_type("cell_angle_alpha", "_cell_angle_alpha", "Cell angle alpha.")
-    assert result == SemanticType.LATTICE_PARAMETER
+    assert result is None
 
 
 def test_infer_generic_length() -> None:
     result = _infer_semantic_type("bond_length", "structure.bond_length", "Bond length in Å.")
-    assert result == SemanticType.LENGTH
+    assert result == semantic_types.LENGTH
 
 
 # --- per_atom detection ---
@@ -173,7 +178,7 @@ def test_nomad_energy_total(nomad_schema: SchemaModel) -> None:
     assert f.path == "run[0].calculation[-1].energy.total.value"
     assert f.datatype == "float"
     assert f.unit == "J"
-    assert f.semantic_type == SemanticType.ENERGY
+    assert f.semantic_type == semantic_types.ENERGY
     assert f.per_atom is False
     assert f.shape is None
     assert f.cardinality == "one"
@@ -182,42 +187,42 @@ def test_nomad_energy_total(nomad_schema: SchemaModel) -> None:
 def test_nomad_energy_total_per_atom(nomad_schema: SchemaModel) -> None:
     f = _get(nomad_schema, "energy_total_per_atom")
     assert f.per_atom is True
-    assert f.semantic_type == SemanticType.ENERGY
+    assert f.semantic_type == semantic_types.ENERGY
 
 
 def test_nomad_band_gap(nomad_schema: SchemaModel) -> None:
-    assert _get(nomad_schema, "band_gap").semantic_type == SemanticType.BANDGAP
+    assert _get(nomad_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
 
 
 def test_nomad_lattice_vectors(nomad_schema: SchemaModel) -> None:
     f = _get(nomad_schema, "lattice_vectors")
-    assert f.semantic_type == SemanticType.LATTICE_PARAMETER
+    assert f.semantic_type is None
     assert f.shape == [3, 3]
     assert f.cardinality == "many"
 
 
 def test_nomad_atom_positions(nomad_schema: SchemaModel) -> None:
     f = _get(nomad_schema, "atom_positions")
-    assert f.semantic_type == SemanticType.ATOMIC_POSITION
+    assert f.semantic_type == semantic_types.ATOMIC_POSITION
     assert f.coordinate_frame == CoordinateFrame.CARTESIAN
     assert f.shape == [None, 3]
 
 
 def test_nomad_atom_labels(nomad_schema: SchemaModel) -> None:
     f = _get(nomad_schema, "atom_labels")
-    assert f.semantic_type == SemanticType.LABEL
+    assert f.semantic_type is None
     assert f.shape == [None]
 
 
 def test_nomad_periodicity(nomad_schema: SchemaModel) -> None:
     f = _get(nomad_schema, "periodicity")
-    assert f.semantic_type == SemanticType.FLAG
+    assert f.semantic_type is None
     assert f.shape == [3]
 
 
 def test_nomad_n_atoms(nomad_schema: SchemaModel) -> None:
     f = _get(nomad_schema, "n_atoms")
-    assert f.semantic_type == SemanticType.IDENTIFIER
+    assert f.semantic_type is None
     assert f.datatype == "int"
     assert f.unit is None
 
@@ -249,7 +254,7 @@ def test_optimade_total_energy(optimade_schema: SchemaModel) -> None:
     f = _get(optimade_schema, "total_energy")
     assert f.path == "attributes._nomad_total_energy"
     assert f.unit == "eV"
-    assert f.semantic_type == SemanticType.ENERGY
+    assert f.semantic_type == semantic_types.ENERGY
     assert f.per_atom is False
 
 
@@ -257,39 +262,39 @@ def test_optimade_energy_per_atom(optimade_schema: SchemaModel) -> None:
     f = _get(optimade_schema, "energy_per_atom")
     assert f.unit == "eV/atom"
     assert f.per_atom is True
-    assert f.semantic_type == SemanticType.ENERGY
+    assert f.semantic_type == semantic_types.ENERGY
 
 
 def test_optimade_cartesian_site_positions(optimade_schema: SchemaModel) -> None:
     f = _get(optimade_schema, "cartesian_site_positions")
-    assert f.semantic_type == SemanticType.ATOMIC_POSITION
+    assert f.semantic_type == semantic_types.ATOMIC_POSITION
     assert f.coordinate_frame == CoordinateFrame.CARTESIAN
     assert f.shape == [None, 3]
 
 
 def test_optimade_lattice_vectors(optimade_schema: SchemaModel) -> None:
     f = _get(optimade_schema, "lattice_vectors")
-    assert f.semantic_type == SemanticType.LATTICE_PARAMETER
+    assert f.semantic_type is None
     assert f.shape == [3, 3]
     assert f.unit == "Angstrom"
 
 
 def test_optimade_dimension_types(optimade_schema: SchemaModel) -> None:
     f = _get(optimade_schema, "dimension_types")
-    assert f.semantic_type == SemanticType.FLAG
+    assert f.semantic_type is None
     assert f.shape == [3]
 
 
 def test_optimade_nperiodic_dimensions(optimade_schema: SchemaModel) -> None:
-    assert _get(optimade_schema, "nperiodic_dimensions").semantic_type == SemanticType.FLAG
+    assert _get(optimade_schema, "nperiodic_dimensions").semantic_type is None
 
 
 def test_optimade_band_gap(optimade_schema: SchemaModel) -> None:
-    assert _get(optimade_schema, "band_gap").semantic_type == SemanticType.BANDGAP
+    assert _get(optimade_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
 
 
 def test_optimade_nsites(optimade_schema: SchemaModel) -> None:
-    assert _get(optimade_schema, "nsites").semantic_type == SemanticType.IDENTIFIER
+    assert _get(optimade_schema, "nsites").semantic_type is None
 
 
 # --- Emmet parser ---
@@ -314,41 +319,41 @@ def test_emmet_energy(emmet_schema: SchemaModel) -> None:
     f = _get(emmet_schema, "energy")
     assert f.path == "calcs_reversed[0].output.energy"
     assert f.unit == "eV"
-    assert f.semantic_type == SemanticType.ENERGY
+    assert f.semantic_type == semantic_types.ENERGY
     assert f.per_atom is False
 
 
 def test_emmet_energy_per_atom(emmet_schema: SchemaModel) -> None:
     f = _get(emmet_schema, "energy_per_atom")
     assert f.per_atom is True
-    assert f.semantic_type == SemanticType.ENERGY
+    assert f.semantic_type == semantic_types.ENERGY
     assert f.unit == "eV/atom"
 
 
 def test_emmet_site_positions(emmet_schema: SchemaModel) -> None:
     f = _get(emmet_schema, "site_positions")
-    assert f.semantic_type == SemanticType.ATOMIC_POSITION
+    assert f.semantic_type == semantic_types.ATOMIC_POSITION
     assert f.coordinate_frame == CoordinateFrame.CARTESIAN
     assert f.shape == [None, 3]
 
 
 def test_emmet_lattice_matrix(emmet_schema: SchemaModel) -> None:
     f = _get(emmet_schema, "lattice_matrix")
-    assert f.semantic_type == SemanticType.LATTICE_PARAMETER
+    assert f.semantic_type is None
     assert f.shape == [3, 3]
     assert f.unit == "Angstrom"
 
 
 def test_emmet_site_labels(emmet_schema: SchemaModel) -> None:
-    assert _get(emmet_schema, "site_labels").semantic_type == SemanticType.LABEL
+    assert _get(emmet_schema, "site_labels").semantic_type is None
 
 
 def test_emmet_band_gap(emmet_schema: SchemaModel) -> None:
-    assert _get(emmet_schema, "band_gap").semantic_type == SemanticType.BANDGAP
+    assert _get(emmet_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
 
 
 def test_emmet_nsites(emmet_schema: SchemaModel) -> None:
-    assert _get(emmet_schema, "nsites").semantic_type == SemanticType.IDENTIFIER
+    assert _get(emmet_schema, "nsites").semantic_type is None
 
 
 # --- str path input ---

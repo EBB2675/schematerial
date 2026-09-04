@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from schematerial.models.ontology import OntologyModel
 from schematerial.models.schema import SchemaModel
+from schematerial.semantics.ontology import OntologyModel
 
 
 @runtime_checkable
