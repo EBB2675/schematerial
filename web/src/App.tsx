@@ -2,6 +2,8 @@ import { useEffect } from "react";
 
 import { useCatalogueQuery } from "./api";
 import { AlignerToolbar } from "./components/AlignerToolbar";
+import { CrosswalkPanel } from "./components/CrosswalkPanel";
+import { PmdcoPanel } from "./components/PmdcoPanel";
 import { PairBar } from "./components/PairBar";
 import { SchemaPane } from "./components/SchemaPane";
 import { useAppDispatch, useAppSelector } from "./store";
@@ -19,7 +21,7 @@ function takesTypedText(node: EventTarget | null): boolean {
 }
 
 /**
- * The aligner: two schemas side by side, read only.
+ * The aligner: two schemas side by side, with manual crosswalk authoring.
  *
  * There is one interface, not a browsing mode and a comparing mode. Closing one
  * side gives back a single full-width schema, which is the same components with
@@ -63,6 +65,7 @@ export function App() {
   return (
     <div className="app">
       <AlignerToolbar schemas={schemas} />
+      <div className="workspace">
       <main className={`panes${expanded === null ? "" : " single"}`}>
         {(expanded === null || expanded === "left") && (
           <SchemaPane side="left" schemas={schemas} />
@@ -71,7 +74,10 @@ export function App() {
           <SchemaPane side="right" schemas={schemas} />
         )}
       </main>
+      <PmdcoPanel />
+      </div>
       <PairBar />
+      <CrosswalkPanel />
     </div>
   );
 }

@@ -1,0 +1,1 @@
+"""SSSOM correspondence persistence."""

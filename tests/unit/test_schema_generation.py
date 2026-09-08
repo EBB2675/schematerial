@@ -103,6 +103,7 @@ def test_nothing_outside_models_defines_a_model_class() -> None:
     exempt = {
         SRC / "semantics" / "ontology.py",  # grounding proposals, decision record 002
         SRC / "identity.py",  # ElementSnapshot, decision 2
+        SRC / "mappings" / "store.py",  # SSSOM rows, not canonical schema elements (decision 6)
     }
     offenders = []
     for path in sorted(SRC.rglob("*.py")):

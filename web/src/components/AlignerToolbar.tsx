@@ -27,8 +27,7 @@ export function AlignerToolbar({ schemas }: { schemas: SchemaSummary[] }) {
       <div className="toolbar-top">
         <h1>schematerial</h1>
         <p className="subtle">
-          {total} schema{total === 1 ? "" : "s"} loaded · read-only: nothing here creates,
-          scores or stores a mapping
+          {total} schema{total === 1 ? "" : "s"} loaded · manual crosswalk authoring
         </p>
       </div>
       <FilterControls

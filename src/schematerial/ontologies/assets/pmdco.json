@@ -1,0 +1,15 @@
+{
+  "version": "3.1.0",
+  "version_iri": "https://w3id.org/pmd/co/3.1.0",
+  "namespace": "https://w3id.org/pmd/co/",
+  "artifact": "pmdco-3.1.0-full.ttl",
+  "sha256": "6a2eaee33c4f8aeac7aa67773ecbeaeb6f5c5e35e2f16488ac8a92ee414a28db",
+  "upstream_commit": "b4ce63ebf325d6596d0a1dba86e478fcafea547d",
+  "source_url": "https://raw.githubusercontent.com/materialdigital/core-ontology/b4ce63ebf325d6596d0a1dba86e478fcafea547d/pmdco-full.ttl",
+  "release_url": "https://github.com/materialdigital/core-ontology/releases/tag/v3.1.0",
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "license_file": "PMDco-LICENSE.txt",
+  "license_sha256": "f5b745ef98087f531e719ee8ca6a96809444573ecc7173c6fa68eaad39b3cc3f",
+  "attribution": "PMDco: Platform Material Digital Ontology, version 3.1.0. MaterialDigital and the creators identified in the ontology. Unmodified upstream release; imported term provenance is retained in the artifact."
+}

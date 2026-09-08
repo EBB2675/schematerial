@@ -187,3 +187,43 @@ export interface SchemaGraph {
   width: number;
   height: number;
 }
+
+export interface MappingRow {
+  supersedes?: string;
+  record_id: string;
+  subject_id: string;
+  object_id: string;
+  predicate_id: string;
+  mapping_justification: string;
+  author_id: string;
+  confidence: number;
+  review_status: "suggested" | "accepted" | "rejected";
+  comment: string;
+  mapping_date: string;
+  subject_snapshot: ElementSnapshot;
+  object_snapshot: ElementSnapshot;
+}
+
+export interface TaxonomyTerm {
+  id: string;
+  uri: string;
+  label: string;
+  definition: string | null;
+  synonyms: string[];
+  parents: string[];
+  anchorable: boolean;
+  deprecated: boolean;
+}
+
+export interface PmdcoTaxonomy {
+  schema: string;
+  version: string;
+  version_iri: string;
+  term_count: number;
+  anchor_count: number;
+  terms: TaxonomyTerm[];
+  attribution?: string;
+  license?: string;
+  license_url?: string;
+  release_url?: string;
+}

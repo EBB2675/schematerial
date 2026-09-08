@@ -1,16 +1,16 @@
 /**
- * The preview API.
+ * Schema browsing and manual crosswalk API.
  *
  * Four read-only shapes: the schema catalogue, one schema's compact element
  * index, one element's detail, and one schema's structural graph. The index and
  * the graph are fetched once per schema and kept; detail is fetched per
  * selection. The graph carries its own laid-out positions, so nothing about it
- * is computed here.
+ * is computed here. Mapping data is refreshed after explicit human writes.
  */
 
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-import type { ElementDetail, IndexRow, SchemaGraph, SchemaSummary } from "./types";
+import type { ElementDetail, IndexRow, MappingRow, PmdcoTaxonomy, SchemaGraph, SchemaSummary } from "./types";
 
 export interface Catalogue {
   schemas: SchemaSummary[];
@@ -26,12 +26,31 @@ const API_BASE = new URL("/api/", window.location.origin).toString();
 
 export const api = createApi({
   reducerPath: "api",
+  tagTypes: ["Mappings"],
   baseQuery: fetchBaseQuery({ baseUrl: API_BASE }),
   // Schemas are ingested once at server startup and never change while it runs.
   keepUnusedDataFor: Number.POSITIVE_INFINITY,
   refetchOnFocus: false,
   refetchOnReconnect: false,
   endpoints: (build) => ({
+    pmdco: build.query<PmdcoTaxonomy, void>({ query: () => "pmdco" }),
+    mappings: build.query<{ rows: MappingRow[] }, void>({
+      query: () => "mappings",
+      providesTags: ["Mappings"],
+      keepUnusedDataFor: 0,
+    }),
+    reviewSession: build.mutation<{ token: string }, void>({
+      query: () => ({ url: "review-session", method: "GET" }),
+    }),
+    humanWrite: build.mutation<MappingRow, {
+      route: "mappings" | "review"; token: string; payload: Record<string, unknown>;
+    }>({
+      query: ({ route, token, payload }) => ({
+        url: `human/${route}`, method: "POST", body: payload,
+        headers: { "X-Review-Token": token },
+      }),
+      invalidatesTags: ["Mappings"],
+    }),
     catalogue: build.query<Catalogue, void>({
       query: () => "schemas",
     }),
@@ -52,5 +71,6 @@ export const api = createApi({
   }),
 });
 
-export const { useCatalogueQuery, useElementsQuery, useGraphQuery, useElementQuery } =
+export const { useCatalogueQuery, useElementsQuery, useGraphQuery, useElementQuery,
+  useMappingsQuery, useReviewSessionMutation, useHumanWriteMutation, usePmdcoQuery } =
   api;

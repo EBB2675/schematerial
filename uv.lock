@@ -1440,6 +1440,7 @@ dependencies = [
     { name = "linkml-runtime" },
     { name = "pydantic" },
     { name = "pyyaml" },
+    { name = "rdflib" },
     { name = "sssom" },
     { name = "uvicorn" },
 ]
@@ -1461,6 +1462,7 @@ requires-dist = [
     { name = "linkml-runtime", specifier = "==1.11.1" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rdflib", specifier = "==7.6.0" },
     { name = "sssom", specifier = "==0.4.21" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]

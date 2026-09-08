@@ -2,6 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { useDispatch, useSelector } from "react-redux";
 
 import { api } from "./api";
+import { authoringSlice } from "./authoringSlice";
 import { uiSlice } from "./uiSlice";
 
 export function createStore() {
@@ -9,6 +10,7 @@ export function createStore() {
     reducer: {
       [api.reducerPath]: api.reducer,
       ui: uiSlice.reducer,
+      authoring: authoringSlice.reducer,
     },
     middleware: (getDefault) => getDefault().concat(api.middleware),
   });

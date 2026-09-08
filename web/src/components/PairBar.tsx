@@ -18,8 +18,8 @@ interface Chosen {
  *
  * This is a reading of the current state, not an assertion about it: the two
  * identifiers are what a person is comparing right now. Nothing here proposes,
- * scores or records a correspondence between them, and there is nowhere for it
- * to be written even if it did.
+ * scores or records a correspondence between them. The separate authoring form
+ * copies this selection only when the human chooses Use selected pair.
  */
 function useChosen(side: Side): Chosen {
   const pane = useAppSelector((state) => state.ui.panes[side]);
@@ -73,7 +73,7 @@ export function PairBar() {
       ))}
       <p className="subtle pair-note">
         {both
-          ? "Two class-scoped element identifiers, one per side. Read-only: nothing is mapped, scored or saved."
+          ? "Choose Use selected pair to start a mapping draft."
           : "Select an element on each side to see both identifiers here."}
       </p>
     </footer>
