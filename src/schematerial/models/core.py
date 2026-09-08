@@ -112,7 +112,7 @@ linkml_meta = LinkMLMeta({'default_prefix': 'smat',
                            'prefix_reference': 'http://qudt.org/schema/qudt/'},
                   'smat': {'prefix_prefix': 'smat',
                            'prefix_reference': 'https://w3id.org/schematerial/core/'}},
-     'source_file': '/home/eboydas/Desktop/develop/schematerial/src/schematerial/schema/schematerial_core.yaml',
+     'source_file': 'schematerial_core.yaml',
      'title': 'schematerial canonical core'} )
 
 class CoordinateFrame(str, Enum):

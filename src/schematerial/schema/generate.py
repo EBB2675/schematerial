@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from linkml.generators.pydanticgen import PydanticGenerator
+from linkml_runtime.linkml_model.meta import SchemaDefinition
 
 SCHEMA_DIR = Path(__file__).parent
 CORE_SCHEMA = SCHEMA_DIR / "schematerial_core.yaml"
@@ -84,7 +85,11 @@ __all__ = [
 
 def render(schema: Path = CORE_SCHEMA) -> str:
     """Return the generated Pydantic view without changing the filesystem."""
-    return _header() + PydanticGenerator(str(schema)).serialize()
+    generator = PydanticGenerator(str(schema))
+    # Loading needs the real path; emitted metadata must be portable.
+    assert isinstance(generator.schema, SchemaDefinition)
+    generator.schema.source_file = schema.name
+    return _header() + generator.serialize()
 
 
 def render_package_init() -> str:

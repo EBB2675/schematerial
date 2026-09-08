@@ -189,3 +189,14 @@ def test_every_facet_is_optional_in_the_schema(facet: str) -> None:
     facets = view.get_class("MaterialsFacets")
     assert facets is not None
     assert attributes_of(facets)[facet].required is False
+
+
+def test_generation_is_independent_of_checkout_location(tmp_path: Path) -> None:
+    outputs = []
+    for checkout in ("first", "second"):
+        schema = tmp_path / checkout / "schematerial_core.yaml"
+        schema.parent.mkdir()
+        schema.write_bytes(generator.CORE_SCHEMA.read_bytes())
+        outputs.append(generator.render(schema))
+    assert outputs[0] == outputs[1]
+    assert str(tmp_path) not in outputs[0]
