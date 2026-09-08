@@ -176,7 +176,7 @@ def test_an_element_with_no_facets_does_not_claim_to_have_any() -> None:
 
 def test_the_core_schema_loads_through_schemaview() -> None:
     view = SchemaView(str(generator.CORE_SCHEMA))
-    assert list(view.all_classes()) == ["MaterialsFacets"]
+    assert set(view.all_classes()) == {"MaterialsFacets", "NomadShape"}
     assert list(view.all_enums()) == ["CoordinateFrame"]
 
 
