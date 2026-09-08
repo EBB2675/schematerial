@@ -165,3 +165,19 @@ def test_the_parsers_emit_facets_that_validate() -> None:
 
     schema = NomadParser().parse(Path(__file__).parent.parent / "fixtures" / "nomad_schema.yaml")
     validate_schema_facets(schema)
+
+
+@pytest.mark.parametrize("value", [":", "x:", "x:bad value", " :value", "energy"])
+def test_malformed_semantic_identifiers_are_rejected(value: str) -> None:
+    attribute = SlotDefinition(name="energy")
+    write_facets(attribute, MaterialsFacets(semantic_type=value))
+    with pytest.raises(FacetError, match="System.energy"):
+        validate_schema_facets(_schema(attribute))
+
+
+@pytest.mark.parametrize("value", ["unfamiliar:Term", "https://example.org/term", "urn:test:term"])
+def test_open_semantic_identifiers_are_preserved(value: str) -> None:
+    attribute = SlotDefinition(name="energy")
+    write_facets(attribute, MaterialsFacets(semantic_type=value))
+    validate_schema_facets(_schema(attribute))
+    assert read_facets(attribute).semantic_type == value

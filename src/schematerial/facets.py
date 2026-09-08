@@ -15,6 +15,8 @@ absent facet gives None -- never a default, never a guess.
 
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Iterator
 
 from linkml_runtime.linkml_model.meta import ClassDefinition, Element, SchemaDefinition
@@ -159,7 +161,7 @@ def facet_problems(element: Element, element_name: str) -> list[str]:
         text = str(raw)
         if not text.strip():
             bad("semantic_type", raw, "a non-empty CURIE or URI")
-        elif ":" not in text:
+        elif not re.fullmatch(r"[A-Za-z][A-Za-z0-9+._-]*:[^\s<>]+", text):
             bad(
                 "semantic_type",
                 raw,
@@ -185,6 +187,19 @@ def facet_problems(element: Element, element_name: str) -> list[str]:
     raw = _annotation_value(element, "unit_normalized")
     if raw is not None and not str(raw).strip():
         bad("unit_normalized", raw, "a non-empty UCUM code")
+
+    if "smat:NomadShape" in instantiates:
+        raw = _annotation_value(element, "source_shape")
+        try:
+            shape = json.loads(str(raw))
+            valid = isinstance(shape, list) and all(
+                (type(dim) is int and dim >= 0) or (isinstance(dim, str) and bool(dim))
+                for dim in shape
+            )
+        except (ValueError, TypeError):
+            valid = False
+        if not valid:
+            bad("source_shape", raw, "a JSON list of nonnegative integers or symbolic strings")
 
     return problems
 
