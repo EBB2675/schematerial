@@ -741,3 +741,23 @@ ul.paths li {
   border-bottom: 1px solid var(--line);
   fill: var(--text);
 }
+
+.crosswalk { flex: 0 0 auto; max-height: 42vh; overflow: auto; padding: 12px 20px;
+  border-top: 1px solid #b9c5cc; background: #f4f7f8; }
+.crosswalk-heading, .mapping-controls, .mapping-fields { display: flex; gap: 12px;
+  flex-wrap: wrap; align-items: center; }
+.crosswalk-heading h2 { margin: 0; font-size: 16px; }
+.crosswalk fieldset { border: 0; padding: 8px 0; margin: 0; }
+.mapping-fields label { display: flex; flex-direction: column; gap: 4px; }
+.mapping-fields input, .mapping-fields select, .mapping-fields textarea { padding: 6px; }
+.mapping-fields .justification { flex: 1; min-width: 240px; }
+.mapping-fields textarea { min-height: 44px; }
+.mapping-direction { overflow-wrap: anywhere; }
+.mapping-records { list-style: none; padding: 0; margin: 12px 0 0; }
+.mapping-records li { border-top: 1px solid #cbd3d8; padding: 10px 0; overflow-wrap: anywhere; }
+.mapping-records p { margin: 4px 0; }
+.mapping-comment { white-space: pre-wrap; }
+.mapping-state { border-radius: 3px; padding: 2px 5px; font-size: 11px; background: #e5e9ec; }
+.mapping-state.accepted, .mapping-state.mapped { color: #155034; background: #d6efe1; }
+.mapping-state.suggested { color: #5b4700; background: #fff0bb; }
+.mapping-state.rejected { color: #763333; background: #f8dfdf; }

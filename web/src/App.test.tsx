@@ -238,6 +238,7 @@ let catalogue = [SUMMARY, BAM_SUMMARY, REFUSED_SUMMARY];
 function respond(url: string): Response {
   const target = new URL(url);
   requests.push(target.pathname + target.search);
+  if (target.pathname === "/api/mappings") return Response.json({ rows: [] });
   if (target.pathname === "/api/schemas") {
     return Response.json({ schemas: catalogue });
   }
@@ -514,7 +515,7 @@ describe("identifiers", () => {
     const bar = screen.getByRole("contentinfo", { name: "selected on each side" });
     await waitFor(() => expect(within(bar).getByText(INHERITED)).toBeDefined());
     expect(within(bar).getByText(BAM_ATTRIBUTE)).toBeDefined();
-    expect(within(bar).getByText(/nothing is mapped, scored or saved/)).toBeDefined();
+    expect(within(bar).getByText(/Use selected pair to start a mapping draft/)).toBeDefined();
   });
 });
 

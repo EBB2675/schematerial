@@ -187,3 +187,18 @@ export interface SchemaGraph {
   width: number;
   height: number;
 }
+
+export interface MappingRow {
+  record_id: string;
+  subject_id: string;
+  object_id: string;
+  predicate_id: string;
+  mapping_justification: string;
+  author_id: string;
+  confidence: number;
+  review_status: "suggested" | "accepted" | "rejected";
+  comment: string;
+  mapping_date: string;
+  subject_snapshot: ElementSnapshot;
+  object_snapshot: ElementSnapshot;
+}

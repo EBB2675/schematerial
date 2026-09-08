@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { useElementsQuery } from "../api";
+import { useElementsQuery, useMappingsQuery } from "../api";
 import { sideLabel, type Side } from "../panes";
 import { buildHaystacks, filterElements } from "../search";
 import { useAppDispatch, useAppSelector } from "../store";
@@ -26,10 +26,12 @@ const number = new Intl.NumberFormat("en");
 function Row({
   row,
   selected,
+  mappingState,
   onSelect,
 }: {
   row: IndexRow;
   selected: boolean;
+  mappingState: string | undefined;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -42,6 +44,7 @@ function Row({
     >
       <span className={`badge kind-${row.kind}`}>{row.kind === "class" ? "C" : "a"}</span>
       <span className="row-name">{row.name}</span>
+      {mappingState && <span className={`mapping-state ${mappingState}`}>{mappingState}</span>}
       {row.kind === "attribute" && <span className="row-owner">{row.class_name}</span>}
       {row.range !== null && <span className="chip">{row.range}</span>}
       {row.unit !== null && <span className="chip unit">{row.unit}</span>}
@@ -78,6 +81,18 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
   const focusRequests = useAppSelector((state) => state.ui.focusRequests);
 
   const { data, isLoading, isError } = useElementsQuery(schema);
+  const { data: mappings } = useMappingsQuery();
+  const mappingStates = useMemo(() => {
+    const states = new Map<string, string>();
+    const rank: Record<string, number> = { rejected: 1, suggested: 2, mapped: 3 };
+    for (const row of mappings?.rows ?? []) {
+      const status = row.review_status === "accepted" ? "mapped" : row.review_status;
+      for (const id of [row.subject_id, row.object_id]) {
+        if ((rank[status] ?? 0) > (rank[states.get(id) ?? ""] ?? 0)) states.set(id, status);
+      }
+    }
+    return states;
+  }, [mappings]);
   const rows = data?.elements ?? NO_ROWS;
   const haystacks = useMemo(() => buildHaystacks(rows), [rows]);
   const filtered = useMemo(
@@ -197,6 +212,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
                 key={row.id}
                 row={row}
                 selected={row.id === selected}
+                mappingState={mappingStates.get(row.id)}
                 onSelect={(id) => {
                   dispatch(activate(side));
                   dispatch(selectElement({ side, id }));
