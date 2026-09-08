@@ -152,10 +152,23 @@ def test_relative_adapter_import_is_allowed() -> None:
 
 
 def accepted_literals(code: str) -> list[int]:
-    # Until Card 12 introduces a human boundary, no app module needs this value.
-    # This is a structural tripwire, not a substitute for store behavior tests.
-    return [node.lineno for node in ast.walk(ast.parse(code))
-            if isinstance(node, ast.Constant) and node.value == "accepted"]
+    # A Literal type can describe imported review states; it cannot write one.
+    tree = ast.parse(code)
+    declarations = {
+        id(child)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "ReviewStatus"
+        and isinstance(node.value, ast.Subscript)
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id == "Literal"
+        for child in ast.walk(node.value)
+    }
+    return [node.lineno for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and node.value == "accepted"
+            and id(node) not in declarations]
 
 
 def test_app_cannot_introduce_accepted_status_literals() -> None:
