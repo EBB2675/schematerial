@@ -189,6 +189,7 @@ export interface SchemaGraph {
 }
 
 export interface MappingRow {
+  supersedes?: string;
   record_id: string;
   subject_id: string;
   object_id: string;

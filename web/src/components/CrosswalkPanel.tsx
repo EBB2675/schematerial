@@ -41,6 +41,7 @@ export function CrosswalkPanel() {
       const { token } = await session().unwrap();
       const payload = draft.reviewId ? {
         record_id: draft.reviewId, action, author_id: draft.author, comment: draft.comment,
+        predicate_id: draft.predicate,
       } : {
         subject_schema: draft.subject.schema, subject_id: draft.subject.id,
         object_schema: draft.object.schema, object_id: draft.object.id,
@@ -70,7 +71,7 @@ export function CrosswalkPanel() {
     {error && <p role="alert">{error}</p>}
     <form onSubmit={submit}>
       <fieldset disabled={busy}>
-        <legend>{draft.reviewId ? "Review suggestion" : "Create a mapping"}</legend>
+        <legend>{draft.reviewId ? "Review or correct mapping" : "Create a mapping"}</legend>
         <div className="mapping-controls">
           <button type="button" disabled={!paired} onClick={() => {
             if (!panes.left.schema || !panes.left.selected || !panes.right.schema || !panes.right.selected) return;
@@ -90,7 +91,7 @@ export function CrosswalkPanel() {
           Object: <code>{draft.object?.id ?? "choose a pair"}</code>
         </p>
         <div className="mapping-fields">
-          <label>Predicate<select value={draft.predicate} disabled={!!draft.reviewId}
+          <label>Predicate<select value={draft.predicate}
             onChange={(e) => dispatch(editDraft({ predicate: e.target.value }))}>
             {["exact", "close", "related", "narrow", "broad"].map((name) =>
               <option key={name} value={`skos:${name}Match`}>{name}</option>)}
@@ -105,8 +106,10 @@ export function CrosswalkPanel() {
         {draft.predicate === "skos:narrowMatch" && <p>Subject has a narrower matching object.</p>}
         {draft.predicate === "skos:broadMatch" && <p>Subject has a broader matching object.</p>}
         {draft.reviewId ? <div className="mapping-controls">
-          <button type="button" disabled={!ready} onClick={() => void save("accept")}>Accept suggestion</button>
-          <button type="button" disabled={!ready} onClick={() => void save("reject")}>Reject suggestion</button>
+          <button type="button" disabled={!ready} onClick={() => void save("accept")}>{data?.rows.find((r) => r.record_id === draft.reviewId)?.review_status === "suggested"
+            ? "Accept suggestion" : "Save accepted correction"}</button>
+          <button type="button" disabled={!ready} onClick={() => void save("reject")}>{data?.rows.find((r) => r.record_id === draft.reviewId)?.review_status === "suggested"
+            ? "Reject suggestion" : "Retract mapping"}</button>
         </div> : <button type="submit" disabled={!ready}>Save accepted mapping</button>}
       </fieldset>
     </form>
@@ -117,10 +120,10 @@ export function CrosswalkPanel() {
         <code>{row.object_id}</code>
         <p>{row.author_id} · {row.mapping_date} · confidence {row.confidence}</p>
         <p className="mapping-comment">{row.comment}</p>
-        {row.review_status === "suggested" && <button type="button" disabled={busy}
+        {<button type="button" disabled={busy}
           onClick={() => { dispatch(reviewRow({ id: row.record_id, subject: row.subject_id,
             object: row.object_id, predicate: row.predicate_id })); setError(""); setMessage(""); }}>
-          Review suggestion
+          {row.review_status === "suggested" ? "Review suggestion" : "Correct mapping"}
         </button>}
       </li>)}
     </ul>

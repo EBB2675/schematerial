@@ -8,13 +8,14 @@ import time
 from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from schematerial.identity import ElementSnapshot
-from schematerial.mappings.store import MappingRow, MappingStore, reference
+from schematerial.mappings.store import MappingRow, MappingStore, current_rows, reference
 from schematerial.web.preview import SchemaPreview
 
 COOKIE = "schematerial_review"
@@ -80,8 +81,9 @@ def install_review(
 
     @app.get("/api/mappings")
     def mappings() -> JSONResponse:
-        return JSONResponse({"rows": [row.model_dump(mode="json") for row in store.rows()]},
-                            headers={"Cache-Control": "no-store"})
+        return JSONResponse(
+            {"rows": [row.model_dump(mode="json") for row in current_rows(store.rows())]},
+            headers={"Cache-Control": "no-store"})
 
     def fields(payload: dict[str, Any], expected: set[str]) -> None:
         if set(payload) != expected:
@@ -111,7 +113,8 @@ def install_review(
 
         def create(rows: list[MappingRow]) -> MappingRow:
             triple = (row.subject_id, row.predicate_id, row.object_id)
-            if any((r.subject_id, r.predicate_id, r.object_id) == triple for r in rows):
+            if any((r.subject_id, r.predicate_id, r.object_id) == triple
+                   for r in current_rows(rows)):
                 raise HTTPException(
                     409, "Correspondence already exists; reload mappings and inspect the saved row"
                 )
@@ -126,7 +129,8 @@ def install_review(
     @app.post("/api/human/review")
     def review_manual(request: Request, payload: dict[str, Any]) -> JSONResponse:
         authorize(request)
-        fields(payload, {"record_id", "action", "author_id", "comment"})
+        fields(payload, {"record_id", "action", "author_id", "comment"}
+               | ({"predicate_id"} if "predicate_id" in payload else set()))
         if payload["action"] not in ("accept", "reject"):
             raise HTTPException(422, "Choose accept or reject")
         try:
@@ -137,24 +141,32 @@ def install_review(
             raise HTTPException(422, str(error)) from error
 
         def review(rows: list[MappingRow]) -> MappingRow:
-            for i, row in enumerate(rows):
+            for row in rows:
                 if row.record_id != payload["record_id"]:
                     continue
-                if row.review_status != "suggested":
+                if row not in current_rows(rows):
                     raise HTTPException(409, "This row has already been reviewed; reload mappings")
                 result = MappingRow.model_validate({
                     **row.model_dump(),
+                    "record_id": f"urn:uuid:{uuid4()}", "supersedes": row.record_id,
+                    "predicate_id": payload.get("predicate_id", row.predicate_id),
                     "review_status": "accepted" if payload["action"] == "accept" else "rejected",
                     "author_id": payload["author_id"], "mapping_date": date.today(),
                     "mapping_justification": "semapv:ManualMappingCuration",
-                    "comment": f"{payload['comment']}\n\nOriginal suggestion by {row.author_id} "
-                               f"({row.mapping_justification}): {row.comment}",
+                    "comment": payload["comment"],
                 })
-                rows[i] = result
+                if any(r.record_id != row.record_id and
+                       (r.subject_id, r.predicate_id, r.object_id) ==
+                       (result.subject_id, result.predicate_id, result.object_id)
+                       for r in current_rows(rows)):
+                    raise HTTPException(409, "Correspondence already exists")
+                rows.append(result)
                 return result
             raise HTTPException(404, "Unknown mapping record")
         try:
             saved = store._transaction(review)
+        except ValidationError as error:
+            raise HTTPException(422, str(error)) from error
         except OSError as error:
             raise HTTPException(503, "Review could not be saved; retry explicitly") from error
         return JSONResponse(saved.model_dump(mode="json"))

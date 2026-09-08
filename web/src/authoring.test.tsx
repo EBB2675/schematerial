@@ -43,7 +43,7 @@ beforeEach(() => {
           parents: ["https://example.org/Entity"], anchorable: true, deprecated: false },
       ],
     });
-    if (path === "/api/mappings") { reads++; return Response.json({ rows: saved }); }
+    if (path === "/api/mappings") { reads++; return Response.json({ rows: saved.filter((r) => !saved.some((s) => s.supersedes === r.record_id)) }); }
     if (path === "/api/review-session") return Response.json({ token: "session-token" });
     if (path.includes("/elements")) return Response.json({ schema: path.includes("nomad") ? "nomad" : "bam",
       elements: [index(path.includes("nomad") ? NOMAD : BAM)] });
@@ -53,9 +53,10 @@ beforeEach(() => {
       if (failSave) return Response.json({ detail: "Disk unavailable; draft not saved" }, { status: 503 });
       if (path.endsWith("/review")) {
         const row = saved.find((r) => r.record_id === body.record_id)!;
-        const result = { ...row, review_status: body.action === "accept" ? "accepted" : "rejected",
+        const result = { ...row, record_id: `urn:uuid:row-${saved.length}`, supersedes: row.record_id,
+          predicate_id: body.predicate_id ?? row.predicate_id, review_status: body.action === "accept" ? "accepted" : "rejected",
           author_id: body.author_id, comment: body.comment } as MappingRow;
-        saved = saved.map((r) => r.record_id === result.record_id ? result : r);
+        saved.push(result);
         return Response.json(result);
       }
       const row = { ...body, record_id: `urn:uuid:row-${saved.length}`, review_status: "accepted",
@@ -161,7 +162,9 @@ it.each(["accept", "reject"] as const)("requires explicit %s after opening a sug
   expect(posts[0]?.path).toBe("/api/human/review");
   expect(posts[0]?.body.action).toBe(action);
   await waitFor(() => expect(screen.queryByRole("button", { name: "Review suggestion" })).toBeNull());
-  expect(saved[0]?.review_status).toBe(action === "accept" ? "accepted" : "rejected");
+  expect(saved[0]?.review_status).toBe("suggested");
+  expect(saved[1]?.supersedes).toBe(saved[0]?.record_id);
+  expect(saved[1]?.review_status).toBe(action === "accept" ? "accepted" : "rejected");
 });
 
 
@@ -215,4 +218,33 @@ it("browses the taxonomy and labels imported ancestors as context", async () => 
   await user.type(search, "no-such-term");
   expect(await within(ontology).findByText("No terms match this search.")).toBeDefined();
   expect(posts).toHaveLength(0);
+});
+
+
+it("corrects and retracts an accepted mapping while keeping its history", async () => {
+  await mount();
+  const user = await draft();
+  await user.click(screen.getByRole("button", { name: "Save accepted mapping" }));
+  await user.click(await screen.findByRole("button", { name: "Correct mapping" }));
+  await user.selectOptions(screen.getByLabelText("Predicate"), "skos:exactMatch");
+  await user.type(screen.getByLabelText("Author URI or ORCID"), "https://example.org/human");
+  await user.type(screen.getByLabelText("Justification"), "Correct predicate");
+  await user.click(screen.getByRole("button", { name: "Save accepted correction" }));
+  await waitFor(() => expect(saved).toHaveLength(2));
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Saved to the crosswalk."));
+  expect(saved[0]?.predicate_id).toBe("skos:closeMatch");
+  expect(saved[1]?.predicate_id).toBe("skos:exactMatch");
+  expect(saved[1]?.supersedes).toBe(saved[0]?.record_id);
+  const records = screen.getByRole("list", { name: "saved mappings" });
+  await waitFor(() => expect(within(records).getAllByRole("listitem")).toHaveLength(1));
+  await user.click(await screen.findByRole("button", { name: "Correct mapping" }));
+  await user.type(screen.getByLabelText("Author URI or ORCID"), "https://example.org/human");
+  await user.type(screen.getByLabelText("Justification"), "Retract mistaken mapping");
+  await user.click(screen.getByRole("button", { name: "Retract mapping" }));
+  await waitFor(() => expect(saved).toHaveLength(3));
+  expect(saved[2]?.review_status).toBe("rejected");
+  expect(saved[2]?.supersedes).toBe(saved[1]?.record_id);
+  await waitFor(() => expect(within(records).getByText("rejected")).toBeDefined());
+  expect(within(records).getAllByRole("listitem")).toHaveLength(1);
+  await waitFor(() => expect(screen.queryByText("mapped")).toBeNull());
 });

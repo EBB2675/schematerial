@@ -138,12 +138,14 @@ def test_explicit_suggestion_review_persists(previews, tmp_path, action, status)
     assert store.rows() == [suggested]
     response = live.post("/api/human/review", json=payload, headers=headers(live))
     assert response.status_code == 200, response.text
-    reviewed = MappingStore(path).rows()[0]
-    assert reviewed.record_id == suggested.record_id
+    reviewed = MappingStore(path).rows()[-1]
+    assert MappingStore(path).rows()[0] == suggested
+    assert reviewed.record_id != suggested.record_id
+    assert reviewed.supersedes == suggested.record_id
     assert reviewed.review_status == status
     assert reviewed.author_id == payload["author_id"]
     assert payload["comment"] in reviewed.comment
-    assert suggested.mapping_justification in reviewed.comment
+    assert reviewed.comment == payload["comment"]
     assert reviewed.subject_snapshot == suggested.subject_snapshot
     assert store.suggest(suggested) == reviewed
     assert live.post("/api/human/review", json=payload, headers=headers(live)).status_code == 409
@@ -236,3 +238,39 @@ def test_pmdco_anchors_use_the_same_human_authorization(previews, tmp_path):
                          json=form(object_schema="pmdco", object_id="pmdco:Material"))
     assert response.status_code == 403
     assert not path.exists()
+
+
+def test_human_can_correct_retract_and_restore(previews, tmp_path):
+    path = tmp_path / "rows.tsv"
+    live = client(previews, path)
+    original = live.post("/api/human/mappings", json=form(),
+                         headers=headers(live)).json()
+    previous = original
+    for action, predicate, status in [
+        ("accept", "skos:exactMatch", "accepted"),
+        ("reject", "skos:exactMatch", "rejected"),
+        ("accept", "skos:closeMatch", "accepted"),
+    ]:
+        payload = {"record_id": previous["record_id"], "action": action,
+                   "predicate_id": predicate, "author_id": "https://example.org/reviewer",
+                   "comment": "Correcting my earlier decision."}
+        response = live.post("/api/human/review", json=payload, headers=headers(live))
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["supersedes"] == previous["record_id"]
+        assert result["review_status"] == status
+        assert result["predicate_id"] == predicate
+        assert result["subject_id"] == original["subject_id"]
+        assert result["object_id"] == original["object_id"]
+        assert live.post("/api/human/review", json=payload,
+                         headers=headers(live)).status_code == 409
+        assert client(previews, path).get("/api/mappings").json()["rows"] == [result]
+        previous = result
+    history = MappingStore(path).rows()
+    assert len(history) == 4
+    assert history[0].model_dump(mode="json") == original
+    before = path.read_bytes()
+    for item in history:
+        with pytest.raises(ValueError, match="current suggested"):
+            MappingStore(path).reject(item.record_id)
+    assert path.read_bytes() == before

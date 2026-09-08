@@ -130,3 +130,111 @@ def test_missing_header_is_not_an_empty_store(tmp_path: Path):
                            if line.startswith("#"))
     with pytest.raises(ValueError, match="header"):
         decode(headerless)
+
+
+@pytest.mark.parametrize("status", ["accepted", "rejected"])
+def test_reject_refuses_human_decisions(tmp_path, status):
+    original = row(review_status=status)
+    path = tmp_path / "rows.tsv"
+    path.write_text(encode([original], {"mapping_set_id": "urn:uuid:test", "license": "test"}))
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="current suggested"):
+        MappingStore(path).reject(original.record_id)
+    assert path.read_bytes() == before
+
+
+def test_metadata_evolves_without_locking_out_old_files(monkeypatch):
+    from schematerial.mappings.store import CURIE_MAP, EXTENSIONS
+
+    original = row()
+    text = encode([original], {"mapping_set_id": "urn:uuid:test", "license": "test"})
+    monkeypatch.setitem(CURIE_MAP, "future", "https://example.org/future/")
+    monkeypatch.setattr("schematerial.mappings.store.EXTENSIONS", [
+        *EXTENSIONS, {"slot_name": "future", "property": "smat:future", "type_hint": "string"}])
+    assert decode(text)[0] == [original]
+    # Extra unused file declarations and ordering do not change row meaning.
+    import yaml
+    lines = text.splitlines(keepends=True)
+    boundary = next(i for i, line in enumerate(lines) if not line.startswith("#"))
+    metadata = yaml.safe_load("".join(line[2:] for line in lines[:boundary]))
+    metadata["curie_map"]["external"] = "https://example.org/external/"
+    metadata["extension_definitions"].reverse()
+    def document():
+        return ("".join("# " + line + "\n" for line in yaml.safe_dump(metadata).splitlines())
+                + "".join(lines[boundary:]))
+    assert decode(document())[0] == [original]
+    metadata["curie_map"]["nomadsim"] = "https://wrong.example/"
+    with pytest.raises(ValueError, match="namespace"):
+        decode(document())
+
+
+def test_legacy_file_without_supersession_column_loads():
+    import csv
+    import io
+
+    import yaml
+    original = row()
+    text = encode([original], {"mapping_set_id": "urn:uuid:test", "license": "test"})
+    lines = text.splitlines(keepends=True)
+    boundary = next(i for i, line in enumerate(lines) if not line.startswith("#"))
+    metadata = yaml.safe_load("".join(line[2:] for line in lines[:boundary]))
+    metadata["extension_definitions"] = [
+        item for item in metadata["extension_definitions"] if item["slot_name"] != "supersedes"]
+    reader = csv.DictReader(io.StringIO("".join(lines[boundary:])), delimiter="\t")
+    fields = [key for key in (reader.fieldnames or []) if key != "supersedes"]
+    stream = io.StringIO()
+    writer = csv.DictWriter(stream, fieldnames=fields, delimiter="\t")
+    writer.writeheader()
+    writer.writerows({key: value for key, value in cells.items() if key != "supersedes"}
+                     for cells in reader)
+    legacy = ("".join("# " + line + "\n" for line in yaml.safe_dump(metadata).splitlines())
+              + stream.getvalue())
+    assert decode(legacy)[0] == [original]
+
+
+@pytest.mark.parametrize("kind", ["missing", "cycle", "fork"])
+def test_invalid_supersession_history_fails(kind):
+    first = row()
+    second = row(supersedes=first.record_id)
+    rows = [first, second]
+    if kind == "missing":
+        rows = [second]
+    elif kind == "cycle":
+        rows[0] = row(record_id=first.record_id, supersedes=second.record_id)
+    else:
+        rows.append(row(supersedes=first.record_id))
+    with pytest.raises(ValueError, match="supersed|cycle"):
+        decode(encode(rows, {"mapping_set_id": "urn:uuid:test", "license": "test"}))
+
+
+def test_automated_suggestion_cannot_supersede(tmp_path):
+    store = MappingStore(tmp_path / "rows.tsv")
+    first = store.suggest(row())
+    with pytest.raises(ValueError, match="only suggest"):
+        store.suggest(row(supersedes=first.record_id))
+    assert store.rows() == [first]
+
+
+@pytest.mark.parametrize("change", ["missing-prefix", "changed-author-prefix",
+                                   "missing-extension", "changed-extension"])
+def test_used_metadata_must_remain_compatible(change):
+    import yaml
+
+    text = encode([row()], {"mapping_set_id": "urn:uuid:test", "license": "test"})
+    lines = text.splitlines(keepends=True)
+    boundary = next(i for i, line in enumerate(lines) if not line.startswith("#"))
+    metadata = yaml.safe_load("".join(line[2:] for line in lines[:boundary]))
+    if change == "missing-prefix":
+        metadata["curie_map"].pop("bammd")
+    elif change == "changed-author-prefix":
+        metadata["curie_map"]["orcid"] = "https://wrong.example/"
+    elif change == "missing-extension":
+        metadata["extension_definitions"] = [
+            item for item in metadata["extension_definitions"]
+            if item["slot_name"] != "review_status"]
+    else:
+        metadata["extension_definitions"][0]["property"] = "smat:wrong"
+    damaged = ("".join("# " + line + "\n" for line in yaml.safe_dump(metadata).splitlines())
+               + "".join(lines[boundary:]))
+    with pytest.raises(ValueError, match="namespace|extension"):
+        decode(damaged)

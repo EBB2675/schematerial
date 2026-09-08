@@ -37,7 +37,7 @@ ReviewStatus = Literal["suggested", "accepted", "rejected"]
 EXTENSIONS = [
     {"slot_name": name, "property": f"smat:{name}",
      "type_hint": "http://www.w3.org/2001/XMLSchema#string"}
-    for name in ("review_status", "subject_snapshot", "object_snapshot")
+    for name in ("review_status", "subject_snapshot", "object_snapshot", "supersedes")
 ]
 
 
@@ -55,6 +55,7 @@ def reference(value: str) -> str:
 class MappingRow(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     record_id: str = Field(default_factory=lambda: f"urn:uuid:{uuid4()}")
+    supersedes: str = ""
     subject_id: str
     object_id: str
     predicate_id: Predicate
@@ -66,6 +67,11 @@ class MappingRow(BaseModel):
     object_snapshot: ElementSnapshot
     mapping_date: date = Field(default_factory=date.today)
     comment: str = Field(min_length=1)
+
+    @field_validator("supersedes")
+    @classmethod
+    def predecessor(cls, value: str) -> str:
+        return cls.record_uri(value) if value else value
 
     @field_validator("record_id")
     @classmethod
@@ -106,7 +112,12 @@ class MappingRow(BaseModel):
 
 
 def encode(rows: list[MappingRow], metadata: dict) -> str:
-    metadata = {**metadata, "curie_map": CURIE_MAP, "extension_definitions": EXTENSIONS}
+    # Preserve unrelated declarations when updating an existing file.
+    known = {definition["slot_name"] for definition in EXTENSIONS}
+    extras = [definition for definition in metadata.get("extension_definitions", [])
+              if definition["slot_name"] not in known]
+    metadata = {**metadata, "curie_map": {**metadata.get("curie_map", {}), **CURIE_MAP},
+                "extension_definitions": [*EXTENSIONS, *extras]}
     stream = io.StringIO(newline="")
     for line in yaml.safe_dump(metadata, sort_keys=True).splitlines():
         stream.write(f"# {line}\n")
@@ -127,27 +138,70 @@ def decode(text: str) -> tuple[list[MappingRow], dict]:
     if (not isinstance(metadata, dict) or not metadata.get("mapping_set_id")
             or not metadata.get("license")):
         raise ValueError("SSSOM mapping_set_id and license metadata are required")
-    if metadata.get("curie_map") != CURIE_MAP:
-        raise ValueError("SSSOM namespace expansions disagree with element identities")
-    if metadata.get("extension_definitions") != EXTENSIONS:
+    namespaces = metadata.get("curie_map")
+    definitions = metadata.get("extension_definitions")
+    if not isinstance(namespaces, dict):
+        raise ValueError("SSSOM curie_map is required")
+    if not isinstance(definitions, list):
         raise ValueError("missing or incompatible SSSOM extension definitions")
+    declared = {}
+    for definition in definitions:
+        if not isinstance(definition, dict) or "slot_name" not in definition:
+            raise ValueError("invalid SSSOM extension definition")
+        name = definition["slot_name"]
+        if name in declared:
+            raise ValueError("duplicate SSSOM extension definition")
+        declared[name] = definition
     rows = []
     seen = set()
     reader = csv.DictReader(io.StringIO("".join(lines[boundary:])), delimiter="\t")
-    if not set(MappingRow.model_fields).issubset(reader.fieldnames or []):
+    if not (set(MappingRow.model_fields) - {"supersedes"}).issubset(reader.fieldnames or []):
         raise ValueError("SSSOM header is missing required mapping columns")
+    for definition in EXTENSIONS:
+        if definition["slot_name"] in (reader.fieldnames or []):
+            if declared.get(definition["slot_name"]) != definition:
+                raise ValueError("missing or incompatible SSSOM extension definitions")
+            if namespaces.get("smat") != CURIE_MAP["smat"]:
+                raise ValueError("SSSOM namespace expansions disagree with element identities")
     for cells in reader:
         # Derived label/source columns are deliberately ignored: snapshots win.
-        values = {key: cells[key] for key in MappingRow.model_fields}
+        values = {key: cells[key] for key in MappingRow.model_fields if key in cells}
         for side in ("subject", "object"):
             key = f"{side}_snapshot"
             values[key] = ElementSnapshot.model_validate_json(values[key])
         row = MappingRow.model_validate(values)
+        for key in ("subject_id", "object_id", "predicate_id", "author_id",
+                    "mapping_justification"):
+            prefix = getattr(row, key).split(":", 1)[0]
+            if prefix in CURIE_MAP and namespaces.get(prefix) != CURIE_MAP[prefix]:
+                raise ValueError("SSSOM namespace expansions disagree with element identities")
         if row.record_id in seen:
             raise ValueError(f"duplicate record_id: {row.record_id}")
         seen.add(row.record_id)
         rows.append(row)
+    replaced = set()
+    by_id = {row.record_id: row for row in rows}
+    for row in rows:
+        if not row.supersedes:
+            continue
+        if row.supersedes not in by_id or row.supersedes in replaced:
+            raise ValueError("missing or multiply superseded record")
+        replaced.add(row.supersedes)
+        visited = {row.record_id}
+        ancestor = row
+        while ancestor.supersedes:
+            if ancestor.supersedes in visited:
+                raise ValueError("supersession cycle")
+            visited.add(ancestor.supersedes)
+            if ancestor.supersedes not in by_id:
+                raise ValueError("missing superseded record")
+            ancestor = by_id[ancestor.supersedes]
     return rows, metadata
+
+
+def current_rows(rows: list[MappingRow]) -> list[MappingRow]:
+    replaced = {row.supersedes for row in rows if row.supersedes}
+    return [row for row in rows if row.record_id not in replaced]
 
 
 class MappingStore:
@@ -186,11 +240,11 @@ class MappingStore:
             return result
 
     def suggest(self, row: MappingRow) -> MappingRow:
-        if row.review_status != "suggested":
+        if row.review_status != "suggested" or row.supersedes:
             raise ValueError("automated writes may only suggest")
 
         def add(rows: list[MappingRow]) -> MappingRow:
-            for existing in rows:
+            for existing in reversed(rows):
                 if (existing.subject_id, existing.predicate_id, existing.object_id) == (
                     row.subject_id, row.predicate_id, row.object_id
                 ):
@@ -203,6 +257,8 @@ class MappingStore:
         def change(rows: list[MappingRow]) -> MappingRow:
             for i, row in enumerate(rows):
                 if row.record_id == record_id:
+                    if row.review_status != "suggested" or row not in current_rows(rows):
+                        raise ValueError("only current suggested rows can be rejected")
                     result = MappingRow.model_validate(
                         {**row.model_dump(), "review_status": "rejected"}
                     )
