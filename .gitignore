@@ -220,6 +220,11 @@ __marimo__/
 # Pyright cache
 .pyright/
 
+# Node
+#   The interface's build output lands in web/dist, already covered by dist/
+#   above. web/package-lock.json is version controlled.
+node_modules/
+
 # Schematerial generated alignment outputs
 runs/
 

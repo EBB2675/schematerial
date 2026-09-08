@@ -40,6 +40,17 @@ imports:
   - linkml:types
 
 classes:
+  NomadShape:
+    class_uri: smat:NomadShape
+    description: Source-stated NOMAD dimensions, encoded verbatim as a JSON list.
+    attributes:
+      source_shape:
+        slot_uri: smat:source_shape
+        range: string
+        description: >-
+          A JSON list of nonnegative integers or nonempty symbolic strings.
+          Symbols are not evaluated or bound to other quantities.
+
   MaterialsFacets:
     class_uri: smat:MaterialsFacets
     description: >-

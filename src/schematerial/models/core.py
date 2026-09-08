@@ -112,7 +112,7 @@ linkml_meta = LinkMLMeta({'default_prefix': 'smat',
                            'prefix_reference': 'http://qudt.org/schema/qudt/'},
                   'smat': {'prefix_prefix': 'smat',
                            'prefix_reference': 'https://w3id.org/schematerial/core/'}},
-     'source_file': '/home/eboydas/Desktop/develop/schematerial/src/schematerial/schema/schematerial_core.yaml',
+     'source_file': 'schematerial_core.yaml',
      'title': 'schematerial canonical core'} )
 
 class CoordinateFrame(str, Enum):
@@ -134,6 +134,16 @@ class CoordinateFrame(str, Enum):
 
 
 
+class NomadShape(ConfiguredBaseModel):
+    """
+    Source-stated NOMAD dimensions, encoded verbatim as a JSON list.
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'smat:NomadShape',
+         'from_schema': 'https://w3id.org/schematerial/core'})
+
+    source_shape: Optional[str] = Field(default=None, description="""A JSON list of nonnegative integers or nonempty symbolic strings. Symbols are not evaluated or bound to other quantities.""", json_schema_extra = { "linkml_meta": {'domain_of': ['NomadShape'], 'slot_uri': 'smat:source_shape'} })
+
+
 class MaterialsFacets(ConfiguredBaseModel):
     """
     The facets an element may carry, as annotations. Referenced from an element through `instantiates`.
@@ -150,4 +160,5 @@ class MaterialsFacets(ConfiguredBaseModel):
 
 # Model rebuild
 # see https://pydantic-docs.helpmanual.io/usage/models/#rebuilding-a-model
+NomadShape.model_rebuild()
 MaterialsFacets.model_rebuild()

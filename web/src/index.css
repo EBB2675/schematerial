@@ -1,0 +1,743 @@
+@import "@xyflow/react/dist/style.css";
+
+:root {
+  --bg: #ffffff;
+  --panel: #f7f7f8;
+  --line: #e0e0e4;
+  --text: #1c1c1f;
+  --muted: #6b6b76;
+  --accent: #1a4f8a;
+  --accent-bg: #e3edf9;
+  --warn: #8a5a00;
+  --warn-bg: #fdf1d8;
+  --error: #a02020;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a;
+    --panel: #1e1f23;
+    --line: #33343a;
+    --text: #e6e6ea;
+    --muted: #9a9aa6;
+    --accent: #7fb2f0;
+    --accent-bg: #1f2c3d;
+    --warn: #e0b25a;
+    --warn-bg: #3a2f18;
+    --error: #f08080;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.notice {
+  padding: 2rem;
+}
+
+.notice.error,
+.error-text {
+  color: var(--error);
+}
+
+/* Toolbar: the shared search above both sides */
+
+.toolbar {
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 1rem 0.7rem;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.toolbar-top {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-top h1 {
+  font-size: 1rem;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.toolbar .controls {
+  border: 0;
+  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.toolbar .search {
+  min-width: 22rem;
+}
+
+.controls.disabled {
+  opacity: 0.55;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78em;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0 0.25rem;
+}
+
+.notice-inline {
+  margin: 0;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+/* Per-side header */
+
+.header {
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0.75rem;
+  background: var(--panel);
+}
+
+.header-top {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.schema-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.schema-picker select {
+  font: inherit;
+  padding: 0.25rem;
+  max-width: 26rem;
+}
+
+.schema-identity h2 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+
+.expander {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.expander:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The expander already claimed the free space to its left. */
+.header-top:has(.expander) .link-toggle {
+  margin-left: 0;
+}
+
+.link-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.subtle {
+  color: var(--muted);
+}
+
+.schema-identity p {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 0.55rem 0 0;
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  cursor: help;
+}
+
+.count dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.count dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The two sides */
+
+.panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+/* A closed side keeps its picker so it can be reopened, and gives the width
+   it is not using to the side that is showing a schema. */
+.panes:has(.pane-column.left.closed) {
+  grid-template-columns: auto 1fr;
+}
+
+.panes:has(.pane-column.right.closed) {
+  grid-template-columns: 1fr auto;
+}
+
+/* One side given the whole window. */
+.panes.single {
+  grid-template-columns: 1fr;
+}
+
+.pane-column.closed {
+  max-width: 17rem;
+}
+
+.pane-column {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+
+.pane-column.right {
+  border-right: 0;
+}
+
+/* The active side is the one the keyboard drives; the other keeps its own
+   selection, shown dimmed rather than cleared. */
+.pane-column.active {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.pane-column:not(.active) .row.selected {
+  opacity: 0.72;
+}
+
+.pane-closed {
+  padding: 1.5rem 1rem;
+}
+
+.stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.region,
+.detail-region {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.splitter {
+  flex: 0 0 7px;
+  cursor: row-resize;
+  background: var(--line);
+  border: 0;
+  outline: none;
+}
+
+.splitter:hover,
+.splitter:focus-visible {
+  background: var(--accent);
+}
+
+.browser {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.count-line {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.controls {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.search {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.filters label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.kinds {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.kinds button {
+  font: inherit;
+  border: 0;
+  padding: 0.2rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.kinds button.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.controls p {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+/* Virtualised list */
+
+.viewport {
+  flex: 1;
+  overflow-y: auto;
+  outline: none;
+}
+
+.viewport:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.spacer {
+  position: relative;
+}
+
+.slice {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  will-change: transform;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.6rem;
+  border-bottom: 1px solid var(--line);
+  cursor: default;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.row.class {
+  font-weight: 600;
+  background: var(--panel);
+}
+
+.row.attribute .row-name {
+  padding-left: 0.9rem;
+}
+
+.row.selected {
+  background: var(--accent-bg);
+}
+
+.row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-owner {
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 1.15rem;
+  text-align: center;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  padding: 0.05rem 0.25rem;
+  background: var(--line);
+  color: var(--muted);
+}
+
+.badge.kind-class {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.badge.status-partial,
+.badge.role-mixin {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.chip {
+  font-size: 0.72rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 0.4rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chip.unit {
+  font-family: ui-monospace, monospace;
+}
+
+.chip.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: transparent;
+}
+
+/* Detail: one per side, so both sides can be read at once */
+
+.detail {
+  overflow-y: auto;
+  padding: 0.9rem 1rem 2rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.detail.empty {
+  padding-top: 2rem;
+}
+
+.detail-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.6rem;
+}
+
+.detail-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.identifier {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.description {
+  margin: 0.75rem 0;
+  max-width: 60ch;
+}
+
+.detail section {
+  margin-top: 1.1rem;
+}
+
+.detail h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 0.4rem;
+}
+
+.field {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.15rem 0;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.field-label {
+  min-width: 10rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.field-value {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.link {
+  font: inherit;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+ul.diagnostics,
+ul.paths,
+ul.parents,
+ol.parents,
+ul.attribute-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.diagnostics li,
+ul.parents li,
+ol.parents li,
+ul.attribute-list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+ul.paths li {
+  padding: 0.1rem 0;
+  word-break: break-all;
+}
+
+.json {
+  background: var(--panel);
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.unsupported {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.unsupported pre {
+  background: var(--panel);
+  padding: 0.75rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* The pair: what each side has selected, read together */
+
+.pair-bar {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  padding: 0.4rem 1rem 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.pair-side {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.pair-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.pair-id {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.pair-note {
+  margin: 0;
+  font-size: 0.76rem;
+  flex: 1 1 14rem;
+}
+
+/* The class graph */
+
+.graph {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+  outline: none;
+}
+
+.canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.react-flow__renderer,
+.react-flow__pane {
+  background: var(--bg);
+}
+
+/* A class box. Positions come from the server; nothing here moves one. */
+/* Fixed, and matching the size the component declares: React Flow places edges
+   from those numbers rather than measuring the box. */
+.class-node.react-flow__node-default {
+  width: 180px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  box-shadow: none;
+}
+
+.class-node.warned {
+  border-color: var(--warn);
+}
+
+/* Searching dims what it does not reach instead of removing it: a class taken
+   out of the picture would silently cut the edges running through it. */
+.class-node.dimmed {
+  opacity: 0.28;
+}
+
+.class-node.selected,
+.class-node.react-flow__node-default.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.react-flow__edge.structural .react-flow__edge-path {
+  stroke: var(--muted);
+  stroke-width: 1.2;
+}
+
+.react-flow__edge.is_a .react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+/* A mixin is a real distinction the conversion made, not decoration. */
+.react-flow__edge.mixin .react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-dasharray: 5 3;
+}
+
+.react-flow__edge.contains .react-flow__edge-path {
+  stroke: var(--line);
+}
+
+.react-flow__edge-text {
+  font-size: 9px;
+  fill: var(--muted);
+}
+
+.react-flow__controls-button {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  fill: var(--text);
+}

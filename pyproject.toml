@@ -4,20 +4,26 @@ version = "0.0.0"
 description = "Semantic crosswalk compiler for materials-science data models"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "fastapi>=0.115",
+    "jsonschema>=4.0",
     "linkml==1.11.1",
     "linkml-map==0.5.2",
     "linkml-runtime==1.11.1",
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "sssom==0.4.21",
+    "uvicorn>=0.30",
 ]
 
 [project.scripts]
 schematerial = "schematerial.cli:main"
 schematerial-schema = "schematerial.schema.generate:main"
+schematerial-web = "schematerial.web.__main__:main"
 
 [dependency-groups]
 dev = [
+    # Starlette's TestClient transport; the app itself never makes HTTP requests.
+    "httpx2>=0.29",
     "pytest>=8.0",
     "pyright>=1.1",
     "ruff>=0.9",

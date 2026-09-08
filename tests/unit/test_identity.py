@@ -294,7 +294,7 @@ def test_an_unstated_semantic_type_is_absent_not_unknown() -> None:
 
 
 def test_snapshot_index_rejects_the_prototype_instance_paths() -> None:
-    """The fixture schemas still key on instance paths; Card 11 resolves them."""
+    """The fixture schemas still key on instance paths; Card 7 resolves them."""
     root = ClassDefinition(name="root", tree_root=True)
     add_attribute(root, SlotDefinition(name="run[0]", range="float"))
     with pytest.raises(QualifiedNameError) as excinfo:
@@ -382,3 +382,13 @@ def test_a_qualified_name_round_trips_through_join_and_id() -> None:
     segments = ["Run", "a.b", "c%d"]
     qualified = join_qualified_name(segments)
     assert parse_element_id(element_id("smat", qualified)).segments == tuple(segments)
+
+
+def test_disconnected_classes_and_cycles_have_snapshots() -> None:
+    root = ClassDefinition(name="Root", tree_root=True)
+    other = ClassDefinition(name="Other", attributes={"value": SlotDefinition(name="value")})
+    a = ClassDefinition(name="A", attributes={"b": SlotDefinition(name="b", range="B")})
+    b = ClassDefinition(name="B", attributes={"a": SlotDefinition(name="a", range="A")})
+    index = snapshot_index(_inline(root, other, a, b), "smat")
+    assert set(index) == {"smat:Root", "smat:Other", "smat:Other.value",
+                          "smat:A", "smat:A.b", "smat:A.b.a"}

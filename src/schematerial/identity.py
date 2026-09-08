@@ -54,7 +54,7 @@ class Source(StrEnum):
 
     URI expansions are deliberately absent. Decision 1 fixes the prefixes and
     says nothing about what they expand to, and nothing before the SSSOM store
-    needs an expansion. The ``curie_map`` is Card 10's problem.
+    needs an expansion. The ``curie_map`` is Card 9's problem.
     """
 
     NOMAD_SIMULATION = "nomadsim"
@@ -273,16 +273,12 @@ def capture_snapshot(
 def _roots(schema: SchemaDefinition) -> list[str]:
     """The top-level classes decision 1's dotted path starts from.
 
-    An explicit `tree_root` wins. Failing that, a class that is never the range
-    of an attribute is a root: a class reached only through another class is a
-    step on a path, not the start of one. If every class is reachable -- a cycle
-    with no entry point -- every class is treated as a root, because refusing to
-    walk would be worse than walking twice.
+    Explicit `tree_root` classes and classes never used as attribute ranges
+    are roots. The walker adds an entry point for any remaining disconnected
+    component, including cycles, after traversing these roots.
     """
     classes = {str(name): definition for name, definition in classes_of(schema).items()}
     declared = [name for name, definition in classes.items() if definition.tree_root]
-    if declared:
-        return sorted(declared)
 
     ranged: set[str] = set()
     for definition in classes.values():
@@ -290,7 +286,7 @@ def _roots(schema: SchemaDefinition) -> list[str]:
             if attribute.range is not None and str(attribute.range) in classes:
                 ranged.add(str(attribute.range))
     roots = sorted(name for name in classes if name not in ranged)
-    return roots or sorted(classes)
+    return sorted(set(declared) | set(roots))
 
 
 def _snapshot_of(
@@ -322,9 +318,12 @@ def _walk(schema: SchemaDefinition) -> Iterator[tuple[Sequence[str], ElementSnap
     classes = {str(name): definition for name, definition in classes_of(schema).items()}
     version = None if schema.version is None else str(schema.version)
 
+    reached: set[str] = set()
+
     def descend(
         class_name: str, prefix: tuple[str, ...], seen: frozenset[str]
     ) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:
+        reached.add(class_name)
         definition = classes[class_name]
         for attribute_name, attribute in attributes_of(definition).items():
             segments = (*prefix, str(attribute_name))
@@ -335,7 +334,10 @@ def _walk(schema: SchemaDefinition) -> Iterator[tuple[Sequence[str], ElementSnap
             if range_name in classes and range_name not in seen:
                 yield from descend(range_name, segments, seen | {range_name})
 
-    for root in _roots(schema):
+    roots = _roots(schema)
+    for root in [*roots, *sorted(set(classes) - set(roots))]:
+        if root not in roots and root in reached:
+            continue
         yield (root,), _snapshot_of(classes[root], root, None, version)
         yield from descend(root, (root,), frozenset({root}))
 

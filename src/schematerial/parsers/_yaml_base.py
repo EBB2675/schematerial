@@ -17,7 +17,7 @@ the canonical representation: fields become class-local attributes (decision 3),
 a unit is written as a `ucum_code`, and the facets of decision 4 go into
 `annotations` under `instantiates`.
 
-These are prototype readers over fixture files, not adapters. Cards 6 to 9
+These are prototype readers over fixture files, not adapters. Cards 6 to 8
 replace them with extractors and real adapters over the Card 5 contract.
 """
 
@@ -35,9 +35,8 @@ from linkml_runtime.linkml_model.meta import (
 )
 
 from schematerial._linkml import add_attribute, add_class, set_annotation
-from schematerial.facets import write_facets
-from schematerial.models.core import CoordinateFrame, MaterialsFacets
-from schematerial.semantics import semantic_types
+from schematerial.facets import validate_schema_facets, write_facets
+from schematerial.models.core import MaterialsFacets
 
 CANONICAL_PREFIXES: Any = {
     "linkml": "https://w3id.org/linkml/",
@@ -94,70 +93,6 @@ def _linkml_range(datatype: str) -> str | None:
     return _RANGES.get(datatype)
 
 
-def _infer_semantic_type(name: str, path: str, description: str | None) -> str | None:
-    """Keyword heuristic over the combined name + path + description text.
-
-    Returns a CURIE, or None where nothing resolves. This ladder is on borrowed
-    time: decision 4 says inferring a semantic type is a separate, scored step,
-    and Card 14 owns it. It survives here only because it is the sole producer
-    today, retargeted onto real CURIEs.
-
-    Six of the prototype's sixteen categories return None rather than a term.
-    `lattice_parameter` and `k_point` have no single term that is both exact and
-    stably addressable; `identifier`, `label` and `flag` are not quantity kinds
-    at all, they are datatype and role hints; `unknown` is the absence of a
-    semantic type, not a value for one. See decision record 002.
-    """
-    text = f"{name} {path} {description or ''}".lower()
-
-    # Most specific first to avoid false positives
-    if "band_gap" in text or "bandgap" in text or "band gap" in text:
-        return semantic_types.BAND_GAP
-    if "energy" in text:
-        return semantic_types.ENERGY
-    if "force" in text:
-        return semantic_types.FORCE
-    if "stress" in text:
-        return semantic_types.STRESS
-    if "charge" in text:
-        return semantic_types.CHARGE
-    if "spin" in text or "magnetic" in text:
-        return semantic_types.SPIN
-    if "temperature" in text:
-        return semantic_types.TEMPERATURE
-    if "pressure" in text:
-        return semantic_types.PRESSURE
-    if "position" in text and ("atom" in text or "site" in text or "cartesian" in text):
-        return semantic_types.ATOMIC_POSITION
-    if "length" in text:
-        return semantic_types.LENGTH
-
-    return None
-
-
-def _detect_per_atom(name: str, unit: str | None) -> bool | None:
-    """True when the source says so, absent when it does not.
-
-    Decision 4: a facet with no value is absent. The prototype defaulted this
-    to False, which asserts "not per atom" about every element that simply did
-    not mention it.
-    """
-    if unit and "/atom" in unit.lower():
-        return True
-    if "_per_atom" in name.lower():
-        return True
-    return None
-
-
-def _detect_coordinate_frame(name: str, description: str | None) -> CoordinateFrame | None:
-    text = f"{name} {description or ''}".lower()
-    if "cartesian" in text:
-        return CoordinateFrame.cartesian
-    if "fractional" in text:
-        return CoordinateFrame.fractional
-    return None
-
-
 def _attribute(entry: dict, path: Path) -> SlotDefinition:
     name: str = entry["name"]
     field_path: str = entry["path"]
@@ -185,11 +120,7 @@ def _attribute(entry: dict, path: Path) -> SlotDefinition:
 
     write_facets(
         attribute,
-        MaterialsFacets(
-            semantic_type=_infer_semantic_type(name, field_path, description),
-            coordinate_frame=_detect_coordinate_frame(name, description),
-            per_atom=_detect_per_atom(name, unit),
-        ),
+        MaterialsFacets.model_validate(entry.get("facets", {})),
     )
     return attribute
 
@@ -210,12 +141,20 @@ def parse_yaml_schema(source: str | Path, format: str) -> SchemaDefinition:
         )
 
     root = ClassDefinition(name=ROOT_CLASS, tree_root=True)
+    source_paths: dict[str, str] = {}
     for entry in raw_fields:
         if not isinstance(entry, dict):
             raise ValueError(
                 f"{path}: each entry in 'fields' must be a mapping, got {type(entry).__name__}"
             )
         attribute = _attribute(entry, path)
+        name = str(attribute.name)
+        if name in source_paths:
+            raise ValueError(
+                f"{path}: duplicate field {name!r} at {source_paths[name]!r} "
+                f"and {entry['path']!r}; prototype fields must have unique names"
+            )
+        source_paths[name] = entry["path"]
         add_attribute(root, attribute)
 
     schema = SchemaDefinition(
@@ -230,4 +169,5 @@ def parse_yaml_schema(source: str | Path, format: str) -> SchemaDefinition:
         imports=["linkml:types"],
     )
     add_class(schema, root)
+    validate_schema_facets(schema)
     return schema

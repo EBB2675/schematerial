@@ -18,21 +18,29 @@ from linkml_runtime.linkml_model.annotations import Annotation
 from linkml_runtime.linkml_model.meta import (
     ClassDefinition,
     Element,
+    EnumDefinition,
+    PermissibleValue,
     SchemaDefinition,
     SlotDefinition,
 )
 
 __all__ = [
+    "Annotated",
     "add_attribute",
     "add_class",
     "annotations_of",
     "attributes_of",
     "class_of",
     "classes_of",
+    "enums_of",
     "instantiates_of",
     "set_annotation",
     "slots_of",
 ]
+
+Annotated = Element | PermissibleValue
+"""What can carry annotations. The metamodel gives these no common base class,
+although both declare the same `annotations` slot, so the union is written out."""
 
 
 def _container(value: object) -> object:
@@ -53,11 +61,15 @@ def slots_of(schema: SchemaDefinition) -> dict[str, SlotDefinition]:
     return cast("dict[str, SlotDefinition]", _container(schema.slots))
 
 
+def enums_of(schema: SchemaDefinition) -> dict[str, EnumDefinition]:
+    return cast("dict[str, EnumDefinition]", _container(schema.enums))
+
+
 def attributes_of(class_definition: ClassDefinition) -> dict[str, SlotDefinition]:
     return cast("dict[str, SlotDefinition]", _container(class_definition.attributes))
 
 
-def annotations_of(element: Element) -> dict[str, Annotation]:
+def annotations_of(element: Annotated) -> dict[str, Annotation]:
     return cast("dict[str, Annotation]", _container(getattr(element, "annotations", None)))
 
 
@@ -76,7 +88,7 @@ def class_of(schema: SchemaDefinition, name: str) -> ClassDefinition:
     return classes_of(schema)[name]
 
 
-def set_annotation(element: Element, tag: str, value: str) -> None:
+def set_annotation(element: Annotated, tag: str, value: str) -> None:
     """Write one annotation. The same narrowing as `annotations_of`, for writes."""
     annotations_of(element)[tag] = Annotation(tag=tag, value=value)
 
