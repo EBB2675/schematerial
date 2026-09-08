@@ -1,0 +1,10 @@
+[project]
+name = "schematerial-bam-extractor"
+version = "0.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "bam-masterdata==0.13.1",
+]
+
+[tool.uv]
+package = false
