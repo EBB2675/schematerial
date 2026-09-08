@@ -287,6 +287,18 @@ function nodeFor(side: "left" | "right", name: string): HTMLElement {
   return found;
 }
 
+/**
+ * Click a class box.
+ *
+ * A bare click, not a pointer sequence: pressing down on the canvas is how a
+ * reader starts panning it, and the pan handler reads `event.view.document`,
+ * which a browser fills in and jsdom leaves null. Selecting a class is what
+ * these tests are about, and a click is all that takes.
+ */
+function clickNode(side: "left" | "right", name: string) {
+  fireEvent.click(nodeFor(side, name));
+}
+
 function placement(side: "left" | "right"): Record<string, string> {
   const at: Record<string, string> = {};
   for (const node of nodes(side)) {
@@ -351,13 +363,13 @@ describe("the class graph", () => {
     await showGraph("left", user);
     const before = placement("left");
 
-    fireEvent.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
     await waitFor(() =>
       expect(nodeFor("left", "Child").className).toContain("selected"),
     );
     expect(placement("left")).toEqual(before);
 
-    fireEvent.click(nodeFor("left", "Root"));
+    clickNode("left", "Root");
     await waitFor(() => expect(nodeFor("left", "Root").className).toContain("selected"));
     // Every box, not only the two that were clicked, is where it started.
     expect(placement("left")).toEqual(before);
@@ -396,7 +408,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
-    fireEvent.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
 
     await within(pane("left")).findByText("A converted section.");
     expect(pane("left").querySelector(".identifier")?.textContent).toBe(CHILD);
@@ -410,7 +422,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
-    fireEvent.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
     await waitFor(() => expect(nodeFor("left", "Child").className).toContain("selected"));
 
     const views = within(pane("left")).getByRole("group", { name: "view on the left" });
@@ -470,7 +482,7 @@ describe("the class graph", () => {
     // The split only divides anything once there is a detail to divide with,
     // so pick a class first -- on the graph, where the boxes are laid out.
     await showGraph("left", user);
-    await user.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
     await user.click(
       within(within(pane("left")).getByRole("group", { name: "view on the left" })).getByRole(
         "button",
@@ -498,7 +510,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
-    await user.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
     const splitter = within(pane("left")).getByRole("separator");
     const before = Number(splitter.getAttribute("aria-valuenow"));
 
