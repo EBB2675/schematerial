@@ -1428,17 +1428,29 @@ ul.paths li {
   white-space: nowrap;
 }
 
+/* The identifier columns take what they can before the ellipsis. The author and
+   justification columns are given a floor as well as a ceiling, so an ORCID URI
+   is two lines rather than six. */
 .mapping-table td:nth-child(2),
 .mapping-table td:nth-child(4) {
   max-width: 20rem;
 }
 
-.mapping-table .justification {
-  max-width: 24rem;
+.mapping-table td.wrap:nth-child(5) {
+  min-width: 13rem;
+  max-width: 18rem;
 }
 
-.mapping-table td.wrap:nth-child(5) {
-  max-width: 13rem;
+.mapping-table .justification {
+  min-width: 12rem;
+  max-width: 22rem;
+}
+
+/* The action column is as wide as its button and no wider, so nothing clips it. */
+.mapping-table th:last-child,
+.mapping-table td:last-child {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .mapping-table .justification {

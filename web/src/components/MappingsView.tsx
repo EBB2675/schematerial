@@ -33,12 +33,28 @@ function matches(row: MappingRow, query: string): boolean {
     .every((token) => text.includes(token));
 }
 
-/** One end of a saved row: the snapshot's name, with the stored identifier under it. */
+/**
+ * One end of a saved row: the snapshot's name, with the stored identifier under
+ * it. The name may wrap at the dot between the class and the attribute, which
+ * is the only place breaking it still reads as the name it is.
+ */
 function End({ id, row, which }: { id: string; row: MappingRow; which: "subject" | "object" }) {
   const snapshot = which === "subject" ? row.subject_snapshot : row.object_snapshot;
+  const label = snapshotLabel(snapshot, id);
+  const dot = label.lastIndexOf(".");
   return (
     <div className="cell-end">
-      <span className="cell-name">{snapshotLabel(snapshot, id)}</span>
+      <span className="cell-name">
+        {dot > 0 ? (
+          <>
+            {label.slice(0, dot + 1)}
+            <wbr />
+            {label.slice(dot + 1)}
+          </>
+        ) : (
+          label
+        )}
+      </span>
       <span className="cell-id">
         <span className="chip source">{idPrefix(id)}</span>
         <code title={id}>{id}</code>
