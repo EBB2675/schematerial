@@ -1,4 +1,4 @@
-"""Start the read-only preview over one or more extraction documents.
+"""Start schema browsing and local manual crosswalk authoring.
 
 Ingestion, materialisation and index preparation all finish before the server
 starts listening, so the first request is served from prepared bytes like every
@@ -35,7 +35,7 @@ def _describe(preview: SchemaPreview) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="schematerial-web",
-        description="Serve a read-only preview of extracted schemas.",
+        description="Serve extracted schemas with local manual crosswalk authoring.",
     )
     parser.add_argument(
         "documents", nargs="+", type=Path, help="extraction contract JSON documents"
@@ -48,6 +48,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="built interface directory; defaults to web/dist in a source checkout",
     )
+    parser.add_argument("--mappings", type=Path, default=Path("runs/crosswalk.sssom.tsv"),
+                        help="persistent SSSOM crosswalk (default: runs/crosswalk.sssom.tsv)")
     arguments = parser.parse_args(argv)
 
     previews = ingest(arguments.documents)
@@ -59,7 +61,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"No built interface at {root}; serving the API and build instructions.")
     print(f"Listening on http://{arguments.host}:{arguments.port}")
 
-    uvicorn.run(create_app(previews, client_root=root), host=arguments.host, port=arguments.port)
+    uvicorn.run(create_app(previews, client_root=root, mapping_path=arguments.mappings),
+                host=arguments.host, port=arguments.port)
     return 0
 
 

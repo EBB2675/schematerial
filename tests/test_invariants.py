@@ -173,7 +173,20 @@ def accepted_literals(code: str) -> list[int]:
 
 def test_app_cannot_introduce_accepted_status_literals() -> None:
     for path in (REPO / "src" / "schematerial").rglob("*.py"):
-        assert accepted_literals(path.read_text()) == [], str(path)
+        code = path.read_text()
+        if path == REPO / "src/schematerial/web/human_review.py":
+            tree = ast.parse(code)
+            allowed = set()
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.FunctionDef)
+                        and node.name in {"create_manual", "review_manual"}):
+                    # Every accepting route must authorize before inspecting or writing data.
+                    assert ast.unparse(node.body[0]) == "authorize(request)"
+                    allowed.update(child.lineno for child in ast.walk(node)
+                                   if isinstance(child, ast.Constant) and child.value == "accepted")
+            assert set(accepted_literals(code)) == allowed
+        else:
+            assert accepted_literals(code) == [], str(path)
 
 
 @pytest.mark.parametrize("code", [
@@ -270,3 +283,14 @@ def test_app_cannot_import_extractor_modules() -> None:
             assert all("extractors" not in module.split(".") for module in modules), (
                 f"{path}: extractor modules must run out of process"
             )
+
+
+def test_only_web_app_installs_human_review_and_no_tool_uses_private_transactions() -> None:
+    root = REPO / "src" / "schematerial"
+    for path in root.rglob("*.py"):
+        code = path.read_text()
+        if path != root / "web" / "app.py" and path != root / "web" / "human_review.py":
+            assert "human_review" not in code, str(path)
+            assert "install_review" not in code, str(path)
+        if path not in {root / "web" / "human_review.py", root / "mappings" / "store.py"}:
+            assert "_transaction" not in code, str(path)

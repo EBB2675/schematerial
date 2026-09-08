@@ -695,3 +695,15 @@ def test_every_inheritance_edge_points_at_a_class_above_it(client: TestClient) -
     for edge in payload["edges"]:
         if edge["kind"] in ("is_a", "mixin"):
             assert at[edge["source"]][1] > at[edge["target"]][1]
+
+
+def test_mapping_snapshots_use_selected_class_scope(previews) -> None:
+    preview = previews[0]
+    detail = preview.details["nomadsim:Child.value"]
+    assert detail["mapping_snapshot"]["parent"] == "Child"
+    assert detail["mapping_snapshot"]["source_version"] == "0.6.0"
+    assert detail["mapping_snapshot"]["unit"] == "m"
+    assert detail["mapping_snapshot"]["semantic_type"] is None
+    assert detail["mapping_snapshot"]["name"] == "value"
+    assert detail["declared_in"]["id"] == "nomadsim:Base"
+    assert "nomadsim:Root.child.value" in detail["snapshot_paths"]

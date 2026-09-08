@@ -1,8 +1,7 @@
-"""The read-only preview server.
+"""Prepared schema browsing, with optional local manual mapping review.
 
-Every handler here is a table lookup followed by a write of bytes that were
-prepared during ingestion. Nothing in a request path materialises a schema,
-reads a file, copies a cached schema or serialises a payload.
+Schema reads serve prepared bytes. Review routes persist SSSOM rows without
+materialising schemas or entering the cache.
 """
 
 from __future__ import annotations
@@ -14,6 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from schematerial.mappings.store import MappingStore
+from schematerial.web.human_review import install_review
 from schematerial.web.preview import SchemaPreview, serialise
 
 __all__ = ["create_app", "default_client_root"]
@@ -51,7 +52,8 @@ def _error(message: str, status: int) -> Response:
 
 
 def create_app(
-    previews: Sequence[SchemaPreview], *, client_root: Path | None = None
+    previews: Sequence[SchemaPreview], *, client_root: Path | None = None,
+    mapping_path: Path | None = None
 ) -> FastAPI:
     """Build the application over schemas that are already fully prepared."""
     registry = {preview.name: preview for preview in previews}
@@ -124,6 +126,9 @@ def create_app(
         if body is None:
             return _error(f"unknown element {id!r} in schema {name!r}", 404)
         return _payload(body)
+
+    if mapping_path is not None:
+        install_review(app, previews, MappingStore(mapping_path))
 
     root = default_client_root() if client_root is None else client_root
     if (root / "index.html").is_file():

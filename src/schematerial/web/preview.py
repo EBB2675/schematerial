@@ -45,7 +45,12 @@ from schematerial._linkml import (
 from schematerial.cache import MaterialisationCache
 from schematerial.extraction.contract import read_document
 from schematerial.facets import read_facets
-from schematerial.identity import ElementSnapshot, element_id, parse_element_id
+from schematerial.identity import (
+    ElementSnapshot,
+    capture_snapshot,
+    element_id,
+    parse_element_id,
+)
 from schematerial.parsers.registry import adapter_for
 from schematerial.parsers.source import SchemaImport, SchemaImportError
 from schematerial.web.graph import build_graph, empty_graph
@@ -421,6 +426,13 @@ def build_preview(imported: SchemaImport, *, package: str | None = None) -> Sche
                     "shape": _json_annotation(attribute, "source_shape"),
                     "annotations": _json_annotation(attribute, "source_annotations"),
                 },
+                "mapping_snapshot": capture_snapshot(
+                    name=name, parent=parse_element_id(attribute_id).parent,
+                    range=None if range_ is None else range_["name"],
+                    unit=None if unit is None else unit["ucum_code"],
+                    semantic_type=read_facets(attribute).semantic_type,
+                    source_version=version,
+                ).model_dump(),
                 "snapshot": None if snapshot is None else snapshot.model_dump(),
                 "snapshot_paths": list(representative),
                 "diagnostics": diagnostics,
@@ -470,6 +482,10 @@ def build_preview(imported: SchemaImport, *, package: str | None = None) -> Sche
                 "snapshot_paths": len(class_paths),
             },
             "attributes": rows,
+            "mapping_snapshot": capture_snapshot(
+                name=class_reference["name"], source_version=version,
+                semantic_type=read_facets(definition).semantic_type,
+            ).model_dump(),
             "snapshot": None if class_snapshot is None else class_snapshot.model_dump(),
             "snapshot_paths": list(class_paths),
             "diagnostics": class_diagnostics,
