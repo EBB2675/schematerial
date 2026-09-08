@@ -1,4 +1,4 @@
-"""The side index embeddings live in. Decision 10, Card 2's migration."""
+"""The side index embeddings live in, after migrating off the core IR."""
 
 import pytest
 

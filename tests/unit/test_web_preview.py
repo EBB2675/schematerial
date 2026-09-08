@@ -412,7 +412,7 @@ class FakeImport:
 class OtherSourceAdapter:
     """A second adapter, standing in for one that is not NOMAD.
 
-    It writes a different decision 1 prefix and none of NOMAD's conversion
+    It writes a different source prefix and none of NOMAD's conversion
     annotations, which is precisely what the preview must not depend on.
     """
 

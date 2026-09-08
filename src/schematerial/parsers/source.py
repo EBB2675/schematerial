@@ -6,8 +6,8 @@ diagnostics raised while converting. Anything that consumes an import -- the
 preview server today, the aligner later -- depends on this shape and on nothing
 that names a particular source package.
 
-The element identifiers an adapter writes carry its own source prefix from
-decision 1. Consumers read that prefix back off the import rather than
+The element identifiers an adapter writes carry its own source prefix.
+Consumers read that prefix back off the import rather than
 assuming one, so a second source does not need a second consumer.
 """
 

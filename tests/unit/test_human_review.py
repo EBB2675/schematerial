@@ -1,4 +1,4 @@
-"""Card 12: real HTTP boundary and persistence, using inline extraction schemas."""
+"""The real HTTP review boundary and its persistence, over inline extraction schemas."""
 from pathlib import Path
 
 import pytest

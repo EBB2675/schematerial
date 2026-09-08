@@ -70,7 +70,7 @@ def test_every_openbis_data_type_row(data_type: str, expected: str | None) -> No
     result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
         data_type=data_type)]))))
     assert field(result).range == expected
-    # Decision 5: the raw openBIS name is stored alongside the normalised range.
+    # The raw openBIS name is stored alongside the normalised range.
     assert annotations_of(field(result))["source_type"].value == data_type
     reported = [row for row in result.report if row["path"] == "Instrument.alias"]
     assert bool(reported) == (expected is None)
@@ -113,7 +113,7 @@ def test_one_global_property_on_two_classes_becomes_two_attributes_with_one_code
         for owner in ("Instrument", "Sample")
     }
     assert codes == {"Instrument": "$NAME", "Sample": "$NAME"}
-    # Decision 3: class-local attributes with distinct identities, never one global slot.
+    # Class-local attributes with distinct identities, never one global slot.
     assert not slots_of(result.loaded.schema)
     identifiers = {str(field(result, owner, "name").slot_uri) for owner in codes}
     assert identifiers == {element_id("bammd", (owner, "name")) for owner in codes}
@@ -335,7 +335,7 @@ def test_the_converted_schema_loads_in_the_preview_alongside_nomad(tmp_path: Pat
     masterdata, nomad = previews
     assert masterdata.summary["source"]["package"] == "bam-masterdata"
     assert masterdata.summary["counts"]["effective_attributes"] == 3
-    # Each import keeps the decision 1 prefix its own adapter wrote.
+    # Each import keeps the source prefix its own adapter wrote.
     assert all(parse_element_id(row["id"]).source == "bammd" for row in masterdata.index)
     assert all(parse_element_id(row["id"]).source == "nomadsim" for row in nomad.index)
     # The inherited property is browsable on the subclass, with its declaring class.

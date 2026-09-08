@@ -1,7 +1,7 @@
 """Persistent SSSOM/TSV correspondence rows, independent of loaded schemas.
 
 Public automated writes can only suggest or reject. Human acceptance is supplied
-by the web review boundary in Card 12. All transactions preserve existing rows.
+by the web review boundary. All transactions preserve existing rows.
 """
 from __future__ import annotations
 

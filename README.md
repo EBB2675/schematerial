@@ -4,6 +4,10 @@ Schematerial translates between heterogeneous materials-science data models by g
 
 AI agents assist with schema inspection, ontology grounding, ambiguity detection, and evidence-based mapping suggestions.
 
+**This project is heavily under construction.** The interface, the extraction contract and the crosswalk format all still change from one commit to the next, so treat anything here as provisional and expect to re-run an extraction after pulling.
+
+![The Align view: BAM masterdata and NOMAD side by side, each schema drawn as a graph of its classes, with a class selected on the left, an attribute on the right, and the pair ready to become a mapping](interface.png)
+
 ## Install
 
 You need [uv](https://docs.astral.sh/uv/) and Python 3.12 or 3.13. The interface also needs [Node.js](https://nodejs.org/) 22 or newer.
@@ -57,7 +61,9 @@ uv run schematerial-web \
 
 Open <http://127.0.0.1:8000>. Give it a few seconds on startup while it reads both files. Use `--port` for a different port.
 
-The page opens with one schema on each side, searchable together and read-only. Either side reads as a list of elements or as a graph of its classes. See [schema aligner](docs/schema-preview.md) for what it shows, how the two sides are synchronised, the API it reads, and how to run its own checks.
+The page opens with one schema on each side, searchable together. The two panes are the workspace: **Align** browses them side by side, and **Mappings** is the crosswalk written so far. Either side reads as a list of elements or as a graph of its classes. Selecting an element on each side offers **Create mapping**, which opens the authoring drawer with an explicit subject, predicate and object; **Add semantic anchor** opens the bundled PMDco taxonomy so either element can be anchored to a term. Counts, diagnostics, keyboard help and toolchain versions are behind the `details` and `?` controls rather than on screen while you read.
+
+See [manual crosswalk authoring](docs/manual-crosswalks.md) for the authoring, review and anchoring workflow in detail.
 
 ## Local development
 
@@ -67,18 +73,3 @@ uv run ruff check .      # lint
 uv run pyright           # type check
 uv run schematerial-schema --check   # generated models match the schema
 ```
-
-## Architecture
-
-- [Source extraction contract](docs/extraction-contract.md)
-- [NOMAD extraction](docs/nomad-extraction.md)
-- [NOMAD JSON adapter](docs/nomad-adapter.md)
-- [BAM masterdata extraction](docs/bam-extraction.md)
-- [BAM masterdata JSON adapter](docs/bam-adapter.md)
-- [Schema aligner](docs/schema-preview.md)
-
-- [Materialisation cache](docs/materialisation-cache.md)
-- [Annotations, ontology terms, and semantic types](docs/decisions/002-annotations-ontology-terms-and-semantic-types.md)
-- [Web layer decisions](docs/decisions/004-web-layer.md)
-- [Structural graph view decisions](docs/decisions/006-structural-graph-view.md)
-- [BAM masterdata conversion decisions](docs/decisions/005-bam-masterdata-linkml-conversion.md)

@@ -131,13 +131,13 @@ def _attribute(
     set_annotation(attribute, "source_kind", raw["kind"])
     set_annotation(attribute, "source_range", json.dumps(range_, sort_keys=True))
     if range_["kind"] == "datatype":
-        # Decision 5: the raw openBIS name is retained alongside the LinkML range.
+        # The raw openBIS name is retained alongside the normalised LinkML range.
         set_annotation(attribute, "source_type", range_["name"])
         if target is None:
             known = range_["name"] in TYPE_RANGES
             partial(f"{'unsupported' if known else 'unmapped'} source type: {range_['name']}")
-    # Decision 3: one global property assigned to several classes becomes one
-    # class-local attribute per class, each carrying that one global code.
+    # One global property assigned to several classes becomes one class-local
+    # attribute per class, each carrying that one global code.
     code = annotations.get("property_code")
     if isinstance(code, str):
         set_annotation(attribute, PROPERTY_CODE, code)

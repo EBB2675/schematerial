@@ -1,6 +1,6 @@
 # DO NOT EDIT. Generated from schematerial_core.yaml by `uv run schematerial-schema`.
 #
-# Pinned versions this file was generated against (decision 9):
+# Pinned versions this file was generated against:
 #   linkml==1.11.1
 #   linkml-runtime==1.11.1
 #   linkml-map==0.5.2

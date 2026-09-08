@@ -3,10 +3,10 @@
 `models/` is generated output. Nothing in it is hand-written and nothing in it
 should be edited: change `schematerial_core.yaml` and run this.
 
-Decision 9 pins the LinkML toolchain and records the pins in the header of every
-generated file, which is what `_header` writes. The pins are read from the
-installed environment rather than hard-coded, so a header can never disagree
-with what actually produced the file.
+The LinkML toolchain is pinned to exact versions, and the pins are recorded in
+the header of every generated file, which is what `_header` writes. They are
+read from the installed environment rather than hard-coded, so a header can
+never disagree with what actually produced the file.
 
 Generating twice produces byte-identical output. gen-pydantic stamps no
 timestamp, and this script adds none.
@@ -28,8 +28,8 @@ MODELS_DIR = SCHEMA_DIR.parent / "models"
 GENERATED = MODELS_DIR / "core.py"
 PACKAGE_INIT = MODELS_DIR / "__init__.py"
 
-# Decision 9 calls the metamodel `linkml-model`; its Python distribution is
-# `linkml-runtime`. Query the distribution name importlib.metadata knows.
+# The metamodel is `linkml-model`; its Python distribution is `linkml-runtime`.
+# Query the distribution name importlib.metadata knows.
 PINNED_DISTRIBUTIONS = ("linkml", "linkml-runtime", "linkml-map", "sssom")
 
 BANNER = "DO NOT EDIT. Generated from schematerial_core.yaml by `uv run schematerial-schema`."
@@ -51,7 +51,7 @@ def _header() -> str:
         [
             f"# {BANNER}",
             "#",
-            "# Pinned versions this file was generated against (decision 9):",
+            "# Pinned versions this file was generated against:",
             *_pins(),
             "",
             "",
@@ -95,9 +95,9 @@ def render(schema: Path = CORE_SCHEMA) -> str:
 def render_package_init() -> str:
     """Return the generated package exports without changing the filesystem.
 
-    Card 2's ``SchemaModel``, ``Entity`` and ``SchemaField`` survive as names
-    for LinkML's generated metamodel classes. They are aliases, not a second
-    hand-written representation of a LinkML schema.
+    ``SchemaModel``, ``Entity`` and ``SchemaField`` survive from the prototype
+    as names for LinkML's generated metamodel classes. They are aliases, not a
+    second hand-written representation of a LinkML schema.
     """
     return _header() + _INIT_BODY
 

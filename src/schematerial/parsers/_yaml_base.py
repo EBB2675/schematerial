@@ -13,12 +13,12 @@ The prototype schema fixtures use the same top-level structure:
         description: ...
 
 This module converts that structure into a LinkML `SchemaDefinition`, which is
-the canonical representation: fields become class-local attributes (decision 3),
-a unit is written as a `ucum_code`, and the facets of decision 4 go into
-`annotations` under `instantiates`.
+the canonical representation: fields become class-local attributes, a unit is
+written as a `ucum_code`, and the materials facets go into `annotations` under
+`instantiates`.
 
-These are prototype readers over fixture files, not adapters. Cards 6 to 8
-replace them with extractors and real adapters over the Card 5 contract.
+These are prototype readers over fixture files, not adapters. The extractors and
+the real adapters over the extraction contract replace them.
 """
 
 import re

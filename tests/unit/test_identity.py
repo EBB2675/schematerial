@@ -1,4 +1,4 @@
-"""Card 1: element identity and snapshot. Decisions 1 and 2."""
+"""Element identity and snapshot."""
 
 import json
 import subprocess
@@ -74,10 +74,10 @@ def _schema() -> SchemaDefinition:
     return _inline(run, calculation, system)
 
 
-# --- the prefix map, decision 1 ----------------------------------------------
+# --- the prefix map ----------------------------------------------------------
 
 
-def test_prefix_map_is_exactly_decision_1() -> None:
+def test_prefix_map_is_exactly_the_five_sources() -> None:
     assert set(PREFIXES) == {
         "nomadsim",
         "nomadmeas",
@@ -167,8 +167,7 @@ def test_same_qualified_name_under_different_sources_differs() -> None:
     )
 
 
-# --- "a qualified name containing an index is rejected with a message,
-#      per decision 1" --------------------------------------------------------
+# --- a qualified name containing an index is rejected with a message ---------
 
 
 @pytest.mark.parametrize(
@@ -186,7 +185,7 @@ def test_an_index_is_rejected_with_a_message(qualified_name: str, offending: str
     message = str(excinfo.value)
     assert offending in message, "the message must name the offending segment"
     assert "schema path" in message and "instance path" in message
-    assert "decision 1" in message
+    assert "cardinality" in message, "the message must say where the index belongs instead"
 
 
 def test_an_index_is_rejected_from_segments_too() -> None:
@@ -256,7 +255,7 @@ def test_a_sparse_snapshot_survives_serialisation_and_reload() -> None:
 
 
 def test_a_snapshot_rejects_unknown_fields() -> None:
-    """Decision 2 fixes what a snapshot holds; decision 10 keeps it small."""
+    """A snapshot holds a fixed, small set of fields and nothing volatile."""
     with pytest.raises(ValueError):
         ElementSnapshot.model_validate({"name": "value", "embedding": [0.1, 0.2]})
 
@@ -288,13 +287,13 @@ def test_snapshot_index_captures_every_element() -> None:
 
 
 def test_an_unstated_semantic_type_is_absent_not_unknown() -> None:
-    """Decision 4: a facet with no value is absent, not guessed."""
+    """A facet with no value is absent, not guessed."""
     index = snapshot_index(_schema(), Source.NOMAD_SIMULATION)
     assert index["nomadsim:Run.calculation.positions"].semantic_type is None
 
 
 def test_snapshot_index_rejects_the_prototype_instance_paths() -> None:
-    """The fixture schemas still key on instance paths; Card 7 resolves them."""
+    """The fixture schemas still key on instance paths; the real adapters do not."""
     root = ClassDefinition(name="root", tree_root=True)
     add_attribute(root, SlotDefinition(name="run[0]", range="float"))
     with pytest.raises(QualifiedNameError) as excinfo:
@@ -304,7 +303,7 @@ def test_snapshot_index_rejects_the_prototype_instance_paths() -> None:
 
 def test_one_class_reached_by_two_paths_gets_two_ids() -> None:
     """A class is a type, an element is a place. The same class reached down two
-    different paths is two elements, and decision 1 gives them two ids."""
+    different paths is two elements, and they get two ids."""
     run = ClassDefinition(name="Run", tree_root=True)
     add_attribute(run, SlotDefinition(name="initial", range="System"))
     add_attribute(run, SlotDefinition(name="final", range="System"))

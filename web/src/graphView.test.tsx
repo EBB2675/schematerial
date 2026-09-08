@@ -287,6 +287,18 @@ function nodeFor(side: "left" | "right", name: string): HTMLElement {
   return found;
 }
 
+/**
+ * Click a class box.
+ *
+ * A bare click, not a pointer sequence: pressing down on the canvas is how a
+ * reader starts panning it, and the pan handler reads `event.view.document`,
+ * which a browser fills in and jsdom leaves null. Selecting a class is what
+ * these tests are about, and a click is all that takes.
+ */
+function clickNode(side: "left" | "right", name: string) {
+  fireEvent.click(nodeFor(side, name));
+}
+
 function placement(side: "left" | "right"): Record<string, string> {
   const at: Record<string, string> = {};
   for (const node of nodes(side)) {
@@ -351,13 +363,13 @@ describe("the class graph", () => {
     await showGraph("left", user);
     const before = placement("left");
 
-    fireEvent.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
     await waitFor(() =>
       expect(nodeFor("left", "Child").className).toContain("selected"),
     );
     expect(placement("left")).toEqual(before);
 
-    fireEvent.click(nodeFor("left", "Root"));
+    clickNode("left", "Root");
     await waitFor(() => expect(nodeFor("left", "Root").className).toContain("selected"));
     // Every box, not only the two that were clicked, is where it started.
     expect(placement("left")).toEqual(before);
@@ -396,7 +408,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
-    fireEvent.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
 
     await within(pane("left")).findByText("A converted section.");
     expect(pane("left").querySelector(".identifier")?.textContent).toBe(CHILD);
@@ -410,7 +422,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
-    fireEvent.click(nodeFor("left", "Child"));
+    clickNode("left", "Child");
     await waitFor(() => expect(nodeFor("left", "Child").className).toContain("selected"));
 
     const views = within(pane("left")).getByRole("group", { name: "view on the left" });
@@ -467,6 +479,16 @@ describe("the class graph", () => {
     const user = userEvent.setup();
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
+    // The split only divides anything once there is a detail to divide with,
+    // so pick a class first -- on the graph, where the boxes are laid out.
+    await showGraph("left", user);
+    clickNode("left", "Child");
+    await user.click(
+      within(within(pane("left")).getByRole("group", { name: "view on the left" })).getByRole(
+        "button",
+        { name: "list" },
+      ),
+    );
     const asList = Number(
       within(pane("left")).getByRole("separator").getAttribute("aria-valuenow"),
     );
@@ -488,6 +510,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
+    clickNode("left", "Child");
     const splitter = within(pane("left")).getByRole("separator");
     const before = Number(splitter.getAttribute("aria-valuenow"));
 
@@ -522,18 +545,20 @@ describe("the class graph", () => {
     expect(screen.getByLabelText("expand the left side")).toBeDefined();
   });
 
-  it("drops the counts block while the graph is shown, to leave it room", async () => {
+  it("keeps the schema counts behind a disclosure and reports the graph's own", async () => {
     const user = userEvent.setup();
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
-    expect(pane("left").querySelectorAll(".count").length).toBeGreaterThan(0);
+    const disclosure = within(pane("left"))
+      .getByLabelText(/^counts and diagnostics/)
+      .closest("details") as HTMLDetailsElement;
+    expect(disclosure.open).toBe(false);
 
     await showGraph("left", user);
-    expect(pane("left").querySelectorAll(".count")).toHaveLength(0);
-    // The count that matters on a canvas is still reported.
+    // Switching view does not put seven totals back on the canvas's header.
+    expect(disclosure.open).toBe(false);
+    // The counts that matter on a canvas are reported next to it.
     expect(within(pane("left")).getByText(/4 classes · 3 structural edges/)).toBeDefined();
-    // The other side, still a list, keeps its counts.
-    expect(pane("right").querySelectorAll(".count").length).toBeGreaterThan(0);
   });
 
   it("offers no graph for a side whose import was refused", async () => {
