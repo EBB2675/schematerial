@@ -13,6 +13,7 @@ from pathlib import Path
 
 import uvicorn
 
+from schematerial.ontologies.pmdco import load_bundled
 from schematerial.web.app import create_app, default_client_root
 from schematerial.web.preview import SchemaPreview, ingest
 
@@ -52,6 +53,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="persistent SSSOM crosswalk (default: runs/crosswalk.sssom.tsv)")
     arguments = parser.parse_args(argv)
 
+    taxonomy = load_bundled()
+    print(f"Loaded bundled PMDco {taxonomy.version}: {len(taxonomy.terms)} taxonomy terms")
     previews = ingest(arguments.documents)
     print(f"Ingested {len(previews)} schema(s):")
     for preview in previews:
@@ -61,7 +64,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"No built interface at {root}; serving the API and build instructions.")
     print(f"Listening on http://{arguments.host}:{arguments.port}")
 
-    uvicorn.run(create_app(previews, client_root=root, mapping_path=arguments.mappings),
+    uvicorn.run(create_app(previews, client_root=root, mapping_path=arguments.mappings,
+                          taxonomy=taxonomy),
                 host=arguments.host, port=arguments.port)
     return 0
 

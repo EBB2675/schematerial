@@ -238,7 +238,9 @@ def module_imports(code: str) -> list[str]:
 
 
 def test_web_layer_imports_no_matcher_model_or_network_client() -> None:
-    for path in (REPO / "src" / "schematerial" / "web").rglob("*.py"):
+    root = REPO / "src" / "schematerial"
+    paths = [*(root / "web").rglob("*.py"), *(root / "ontologies").rglob("*.py")]
+    for path in paths:
         for module in module_imports(path.read_text()):
             offending = [
                 banned

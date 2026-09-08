@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from schematerial.mappings.store import MappingRow, MappingStore
+from schematerial.ontologies.pmdco import parse_taxonomy
 from schematerial.parsers.bam_json import BamAdapter
 from schematerial.parsers.nomad_json import NomadAdapter
 from schematerial.web.app import create_app
@@ -31,8 +32,9 @@ def previews():
     return [build_preview(NomadAdapter().convert(nomad)), build_preview(BamAdapter().convert(bam))]
 
 
-def client(previews, path, **kwargs):
-    return TestClient(create_app(previews, mapping_path=path, client_root=Path("/nonexistent")),
+def client(previews, path, *, taxonomy=None, **kwargs):
+    return TestClient(create_app(previews, mapping_path=path, client_root=Path("/nonexistent"),
+                                 taxonomy=taxonomy),
                       base_url="http://localhost", client=("127.0.0.1", 12345), **kwargs)
 
 
@@ -175,4 +177,62 @@ def test_expired_session_and_disk_failure_leave_store_unchanged(previews, tmp_pa
     response = live.post("/api/human/mappings", json=form(), headers=headers(live))
     assert response.status_code == 503
     assert "unsaved" in response.json()["detail"]
+    assert not path.exists()
+
+
+PMDCO_TURTLE = b'''
+@prefix p: <https://w3id.org/pmd/co/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+p: a owl:Ontology; owl:versionIRI p:3.1.0 .
+p:Material a owl:Class; rdfs:label "Material";
+    rdfs:subClassOf <https://example.org/Entity> .
+<https://example.org/Entity> a owl:Class; rdfs:label "Entity" .
+'''
+
+
+def test_direct_mapping_and_both_pmdco_anchors_coexist_offline(previews, tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("external service or materialisation entered")
+    monkeypatch.setattr("socket.socket.connect", forbidden)
+    monkeypatch.setattr("urllib.request.urlopen", forbidden)
+    monkeypatch.setattr("schematerial.cache.MaterialisationCache.get", forbidden)
+    taxonomy = parse_taxonomy(PMDCO_TURTLE, version="3.1.0")
+    path = tmp_path / "complete-crosswalk.tsv"
+    live = client(previews, path, taxonomy=taxonomy)
+    assert live.get("/api/pmdco").content == taxonomy.payload_bytes
+    drafts = [form(), form(object_schema="pmdco", object_id="pmdco:Material"),
+              form(subject_schema="bam", subject_id="bammd:Sample.value",
+                   object_schema="pmdco", object_id="pmdco:Material")]
+    created = []
+    for draft in drafts:
+        response = live.post("/api/human/mappings", json=draft, headers=headers(live))
+        assert response.status_code == 201, response.text
+        created.append(response.json())
+    reopened = client(previews, path, taxonomy=taxonomy)
+    assert reopened.get("/api/mappings").json()["rows"] == created
+    assert len({row["record_id"] for row in created}) == 3
+    assert all(row["review_status"] == "accepted" for row in created)
+    for row in created[1:]:
+        assert row["object_snapshot"]["name"] == "Material"
+        assert row["object_snapshot"]["source_version"] == "3.1.0"
+    exported = MappingStore(path).rows()[1].cells()
+    assert exported["object_source"] == "https://w3id.org/pmd/co/"
+    assert exported["object_source_version"] == "3.1.0"
+    assert exported["object_label"] == "Material"
+    # The browser cannot relabel a contextual ancestor as a PMDco term.
+    for target in ("pmdco:Missing", "https://example.org/Entity"):
+        response = live.post("/api/human/mappings", headers=headers(live),
+                             json=form(object_schema="pmdco", object_id=target))
+        assert response.status_code == 422
+    assert len(MappingStore(path).rows()) == 3
+
+
+def test_pmdco_anchors_use_the_same_human_authorization(previews, tmp_path):
+    taxonomy = parse_taxonomy(PMDCO_TURTLE, version="3.1.0")
+    path = tmp_path / "rows.tsv"
+    live = client(previews, path, taxonomy=taxonomy)
+    response = live.post("/api/human/mappings",
+                         json=form(object_schema="pmdco", object_id="pmdco:Material"))
+    assert response.status_code == 403
     assert not path.exists()

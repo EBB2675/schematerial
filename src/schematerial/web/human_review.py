@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import secrets
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from schematerial.identity import ElementSnapshot
 from schematerial.mappings.store import MappingRow, MappingStore, reference
 from schematerial.web.preview import SchemaPreview
 
@@ -21,13 +22,20 @@ LOCAL = {"localhost", "127.0.0.1", "::1"}
 TTL = 12 * 60 * 60
 
 
-def install_review(app: FastAPI, previews: Sequence[SchemaPreview], store: MappingStore) -> None:
+def install_review(
+    app: FastAPI, previews: Sequence[SchemaPreview], store: MappingStore, *,
+    extra_snapshots: Mapping[tuple[str, str], ElementSnapshot] | None = None,
+) -> None:
     """Install the human boundary over prepared snapshots, with no materialisation."""
     snapshots = {
         (preview.name, identifier): detail["mapping_snapshot"]
         for preview in previews for identifier, detail in preview.details.items()
         if "mapping_snapshot" in detail
     }
+    for key, value in (extra_snapshots or {}).items():
+        if key in snapshots:
+            raise ValueError(f"Duplicate mapping snapshot: {key}")
+        snapshots[key] = value.model_dump()
     secret = secrets.token_bytes(32)
 
     def local(request: Request) -> None:

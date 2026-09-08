@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from schematerial.mappings.store import MappingStore
+from schematerial.ontologies.pmdco import SCHEMA_KEY, PmdcoTaxonomy
 from schematerial.web.human_review import install_review
 from schematerial.web.preview import SchemaPreview, serialise
 
@@ -53,7 +54,7 @@ def _error(message: str, status: int) -> Response:
 
 def create_app(
     previews: Sequence[SchemaPreview], *, client_root: Path | None = None,
-    mapping_path: Path | None = None
+    mapping_path: Path | None = None, taxonomy: PmdcoTaxonomy | None = None
 ) -> FastAPI:
     """Build the application over schemas that are already fully prepared."""
     registry = {preview.name: preview for preview in previews}
@@ -127,8 +128,17 @@ def create_app(
             return _error(f"unknown element {id!r} in schema {name!r}", 404)
         return _payload(body)
 
+    @app.get("/api/pmdco")
+    def read_pmdco() -> Response:
+        if taxonomy is None:
+            return _error("PMDco is not loaded", 404)
+        return _payload(taxonomy.payload_bytes)
+
+    if taxonomy is not None and SCHEMA_KEY in registry:
+        raise ValueError("Schema name pmdco is reserved for the ontology taxonomy")
     if mapping_path is not None:
-        install_review(app, previews, MappingStore(mapping_path))
+        install_review(app, previews, MappingStore(mapping_path),
+                       extra_snapshots={} if taxonomy is None else taxonomy.snapshots())
 
     root = default_client_root() if client_root is None else client_root
     if (root / "index.html").is_file():

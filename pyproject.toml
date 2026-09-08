@@ -11,6 +11,7 @@ dependencies = [
     "linkml-runtime==1.11.1",
     "pydantic>=2.0",
     "pyyaml>=6.0",
+    "rdflib==7.6.0",
     "sssom==0.4.21",
     "uvicorn>=0.30",
 ]
