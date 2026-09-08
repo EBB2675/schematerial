@@ -4,6 +4,10 @@ Schematerial translates between heterogeneous materials-science data models by g
 
 AI agents assist with schema inspection, ontology grounding, ambiguity detection, and evidence-based mapping suggestions.
 
+**This project is heavily under construction.** The interface, the extraction contract and the crosswalk format all still change from one commit to the next, so treat anything here as provisional and expect to re-run an extraction after pulling.
+
+![The Align view: BAM masterdata and NOMAD side by side, each schema drawn as a graph of its classes, with a class selected on the left, an attribute on the right, and the pair ready to become a mapping](interface.png)
+
 ## Install
 
 You need [uv](https://docs.astral.sh/uv/) and Python 3.12 or 3.13. The interface also needs [Node.js](https://nodejs.org/) 22 or newer.
