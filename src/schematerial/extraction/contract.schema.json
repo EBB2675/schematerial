@@ -1,0 +1,390 @@
+{
+  "type": "object",
+  "properties": {
+    "contract_version": {
+      "enum": [
+        "1.0",
+        "1.1",
+        "1.2"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "module"
+      ],
+      "additionalProperties": false
+    },
+    "classes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/class"
+      }
+    },
+    "enums": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/enum_value"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "values"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "report": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "skipped",
+              "warning",
+              "partial"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "path",
+          "status",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "contract_version",
+    "source",
+    "classes",
+    "enums",
+    "report"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/schematerial/extraction/1.2",
+  "title": "Source extraction document",
+  "$defs": {
+    "attribute": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "quantity",
+            "subsection",
+            "property"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "range": {
+          "$ref": "#/$defs/range"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          }
+        },
+        "repeats": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "$ref": "#/$defs/annotations"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      }
+    },
+    "enum_value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "annotations": {
+              "$ref": "#/$defs/annotations"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "class": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "bases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attribute"
+          }
+        },
+        "annotations": {
+          "$ref": "#/$defs/annotations"
+        },
+        "effective_attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/effective_attribute"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "bases",
+        "attributes"
+      ],
+      "additionalProperties": false
+    },
+    "range": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "datatype",
+            "class",
+            "enum"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "effective_attribute": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "quantity",
+            "subsection",
+            "property"
+          ]
+        },
+        "declaring_class_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "declaring_class_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "contract_version": {
+            "enum": [
+              "1.1",
+              "1.2"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "required": [
+              "dependencies"
+            ]
+          },
+          "classes": {
+            "items": {
+              "required": [
+                "effective_attributes"
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source": {
+            "not": {
+              "required": [
+                "dependencies"
+              ]
+            }
+          },
+          "classes": {
+            "items": {
+              "not": {
+                "required": [
+                  "effective_attributes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "contract_version": {
+            "const": "1.2"
+          }
+        }
+      },
+      "then": true,
+      "else": {
+        "properties": {
+          "classes": {
+            "items": {
+              "not": {
+                "required": [
+                  "annotations"
+                ]
+              }
+            }
+          },
+          "enums": {
+            "items": {
+              "properties": {
+                "values": {
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
