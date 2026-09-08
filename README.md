@@ -57,7 +57,9 @@ uv run schematerial-web \
 
 Open <http://127.0.0.1:8000>. Give it a few seconds on startup while it reads both files. Use `--port` for a different port.
 
-The page opens with one schema on each side, searchable together and read-only. Either side reads as a list of elements or as a graph of its classes. See [schema aligner](docs/schema-preview.md) for what it shows, how the two sides are synchronised, the API it reads, and how to run its own checks.
+The page opens with one schema on each side, searchable together. The two panes are the workspace: **Align** browses them side by side, and **Mappings** is the crosswalk written so far. Either side reads as a list of elements or as a graph of its classes. Selecting an element on each side offers **Create mapping**, which opens the authoring drawer with an explicit subject, predicate and object; **Add semantic anchor** opens the bundled PMDco taxonomy so either element can be anchored to a term. Counts, diagnostics, keyboard help and toolchain versions are behind the `details` and `?` controls rather than on screen while you read.
+
+See [schema aligner](docs/schema-preview.md) for what it shows, how the two sides are synchronised, the API it reads, and how to run its own checks.
 
 ## Local development
 
