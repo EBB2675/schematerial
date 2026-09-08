@@ -201,8 +201,7 @@ function Canvas({ side, schema }: { side: Side; schema: string }) {
   return (
     <div className="graph" aria-label={`class graph of ${schema} on the ${sideLabel(side)}`}>
       <p className="count-line subtle">
-        {data.nodes.length} classes · {data.edges.length} structural edges · positions fixed
-        at load
+        {data.nodes.length} classes · {data.edges.length} structural edges
       </p>
       <div
         className="canvas"

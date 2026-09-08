@@ -20,6 +20,24 @@ import type { SchemaSummary } from "./types";
 /** How a side shows its schema: as a list of elements, or as a class graph. */
 export type PaneView = "list" | "graph";
 
+/**
+ * The two things the workspace is for: reading the schemas next to each other,
+ * and reading back what has been written about them. They are separate views
+ * rather than two panels competing for the same window, because browsing wants
+ * every row of height it can get and a crosswalk table wants width.
+ */
+export type Workspace = "align" | "mappings";
+
+/**
+ * Which side is the subject of a mapping written from the current pair.
+ *
+ * A correspondence is directional, so this is a decision a person makes rather
+ * than a consequence of which pane a schema happened to be opened in. It is held
+ * here, next to the panes, so the direction is visible and reversible before any
+ * form is opened.
+ */
+export type PairDirection = "lr" | "rl";
+
 export interface PaneState {
   /** The schema shown here, or null when this side is closed. */
   schema: string | null;
@@ -31,6 +49,8 @@ export interface PaneState {
   linked: boolean;
   /** This side's own search and filters, used only while it is unlinked. */
   filters: Filters;
+  /** Whether this side's detail region is open under its list. */
+  detail: boolean;
 }
 
 export interface UiState {
@@ -49,6 +69,17 @@ export interface UiState {
   expanded: Side | null;
   /** True once the opening pair has been chosen from the catalogue. */
   opened: boolean;
+  /** Which of the two workspaces is on screen. */
+  workspace: Workspace;
+  /** Whether the PMDco dock is open. It stays closed until a person asks for it. */
+  pmdco: boolean;
+  /** Which side the pair reads from. Left to right unless the reader swapped it. */
+  direction: PairDirection;
+  /**
+   * Whether the authoring drawer is on screen. Closing it hides the form and
+   * keeps the draft, so a stray Escape cannot discard unsaved work.
+   */
+  authoring: boolean;
 }
 
 function emptyPane(): PaneState {
@@ -58,6 +89,7 @@ function emptyPane(): PaneState {
     selected: null,
     linked: true,
     filters: { ...EMPTY_FILTERS },
+    detail: true,
   };
 }
 
@@ -68,6 +100,10 @@ const initialState: UiState = {
   focusRequests: 0,
   expanded: null,
   opened: false,
+  workspace: "align",
+  pmdco: false,
+  direction: "lr",
+  authoring: false,
 };
 
 /** The filters a side is actually filtering by: the shared ones unless it unlinked. */
@@ -150,6 +186,28 @@ export const uiSlice = createSlice({
       state.active = action.payload;
       state.focusRequests += 1;
     },
+    /** Open or close one side's detail region without touching the other side. */
+    setDetail(state, action: PayloadAction<{ side: Side; open: boolean }>) {
+      state.panes[action.payload.side].detail = action.payload.open;
+    },
+    setWorkspace(state, action: PayloadAction<Workspace>) {
+      state.workspace = action.payload;
+    },
+    setPmdco(state, action: PayloadAction<boolean>) {
+      state.pmdco = action.payload;
+    },
+    /** Turn the pair round, so the other side becomes the subject. */
+    swapPair(state) {
+      state.direction = state.direction === "lr" ? "rl" : "lr";
+    },
+    /**
+     * Show or hide the authoring form. This is presentation only: the draft it
+     * edits lives in its own slice and survives the drawer being closed, so a
+     * stray Escape never costs unsaved work.
+     */
+    setAuthoring(state, action: PayloadAction<boolean>) {
+      state.authoring = action.payload;
+    },
   },
 });
 
@@ -166,4 +224,9 @@ export const {
   activate,
   focusSide,
   setExpanded,
+  setDetail,
+  setWorkspace,
+  setPmdco,
+  swapPair,
+  setAuthoring,
 } = uiSlice.actions;

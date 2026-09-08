@@ -467,6 +467,16 @@ describe("the class graph", () => {
     const user = userEvent.setup();
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
+    // The split only divides anything once there is a detail to divide with,
+    // so pick a class first -- on the graph, where the boxes are laid out.
+    await showGraph("left", user);
+    await user.click(nodeFor("left", "Child"));
+    await user.click(
+      within(within(pane("left")).getByRole("group", { name: "view on the left" })).getByRole(
+        "button",
+        { name: "list" },
+      ),
+    );
     const asList = Number(
       within(pane("left")).getByRole("separator").getAttribute("aria-valuenow"),
     );
@@ -488,6 +498,7 @@ describe("the class graph", () => {
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
     await showGraph("left", user);
+    await user.click(nodeFor("left", "Child"));
     const splitter = within(pane("left")).getByRole("separator");
     const before = Number(splitter.getAttribute("aria-valuenow"));
 
@@ -522,18 +533,20 @@ describe("the class graph", () => {
     expect(screen.getByLabelText("expand the left side")).toBeDefined();
   });
 
-  it("drops the counts block while the graph is shown, to leave it room", async () => {
+  it("keeps the schema counts behind a disclosure and reports the graph's own", async () => {
     const user = userEvent.setup();
     mount();
     await waitFor(() => expect(within(pane("left")).getByRole("listbox")).toBeDefined());
-    expect(pane("left").querySelectorAll(".count").length).toBeGreaterThan(0);
+    const disclosure = within(pane("left"))
+      .getByLabelText(/^counts and diagnostics/)
+      .closest("details") as HTMLDetailsElement;
+    expect(disclosure.open).toBe(false);
 
     await showGraph("left", user);
-    expect(pane("left").querySelectorAll(".count")).toHaveLength(0);
-    // The count that matters on a canvas is still reported.
+    // Switching view does not put seven totals back on the canvas's header.
+    expect(disclosure.open).toBe(false);
+    // The counts that matter on a canvas are reported next to it.
     expect(within(pane("left")).getByText(/4 classes · 3 structural edges/)).toBeDefined();
-    // The other side, still a list, keeps its counts.
-    expect(pane("right").querySelectorAll(".count").length).toBeGreaterThan(0);
   });
 
   it("offers no graph for a side whose import was refused", async () => {

@@ -3,30 +3,31 @@ import { useCallback, useRef, useState, type KeyboardEvent, type PointerEvent } 
 import { sideLabel, type Side } from "../panes";
 import { useAppDispatch, useAppSelector } from "../store";
 import type { SchemaSummary } from "../types";
-import { activate } from "../uiSlice";
+import { activate, setDetail } from "../uiSlice";
 
 import { ElementBrowser } from "./ElementBrowser";
 import { ElementDetailPanel } from "./ElementDetailPanel";
+import { PaneHeader } from "./PaneHeader";
 import { SchemaGraph } from "./SchemaGraph";
-import { SchemaHeader } from "./SchemaHeader";
 import { UnsupportedNotice } from "./UnsupportedNotice";
 
-// How much of the column the list or the graph takes, as a percentage. The
-// graph starts with more of it: a canvas needs room before it reads as one,
-// while a detail panel stays legible in a strip.
-const LIST_SPLIT = 55;
-const GRAPH_SPLIT = 74;
+// How much of the column the list or the graph takes, as a percentage. The list
+// keeps the larger share: browsing is what the pane is for, and the detail below
+// it stays legible in a strip. The graph starts with more, because a canvas
+// needs room before it reads as one.
+const LIST_SPLIT = 65;
+const GRAPH_SPLIT = 78;
 const MIN_SPLIT = 20;
 const MAX_SPLIT = 92;
 
 /**
- * One side of the aligner: its schema picker, its list or graph, and its detail.
+ * One side of the aligner: its schema, its list or graph, and its detail.
  *
  * Each side inspects its own selection rather than sharing one detail region,
  * so both sides' provenance can be read at the same time -- which is the point
- * of putting two schemas next to each other. How the height divides between the
- * two is the reader's to set, because a graph and a list want different amounts
- * of it.
+ * of putting two schemas next to each other. The detail region collapses to a
+ * single line when the reading is about finding an element rather than
+ * inspecting one, and how the remaining height divides is the reader's to set.
  */
 export function SchemaPane({ side, schemas }: { side: Side; schemas: SchemaSummary[] }) {
   const dispatch = useAppDispatch();
@@ -86,38 +87,69 @@ export function SchemaPane({ side, schemas }: { side: Side; schemas: SchemaSumma
         if (!isActive) dispatch(activate(side));
       }}
     >
-      <SchemaHeader side={side} schemas={schemas} current={current} active={isActive} />
+      <PaneHeader side={side} schemas={schemas} current={current} active={isActive} />
       {current === null ? (
         <div className="pane-closed">
-          <p className="subtle">
-            This side is closed. Choose a schema above to compare it with the other side.
-          </p>
+          <p className="subtle">Closed. Choose a schema above to compare it with the other side.</p>
         </div>
       ) : current.status === "ok" ? (
         <div className="stack" ref={stack}>
-          <div className="region" style={{ flexBasis: `${effective}%` }}>
+          <div
+            className="region"
+            style={
+              pane.detail && pane.selected !== null
+                ? { flexBasis: `${effective}%` }
+                : { flex: "1 1 auto" }
+            }
+          >
             {pane.view === "graph" ? (
               <SchemaGraph side={side} schema={current.name} />
             ) : (
               <ElementBrowser side={side} schema={current.name} />
             )}
           </div>
-          <div
-            className="splitter"
-            role="separator"
-            tabIndex={0}
-            aria-label={`resize the ${sideLabel(side)} side`}
-            aria-valuenow={Math.round(effective)}
-            aria-valuemin={MIN_SPLIT}
-            aria-valuemax={MAX_SPLIT}
-            title="Drag to resize, double-click to reset"
-            onPointerDown={drag}
-            onKeyDown={onSplitKey}
-            onDoubleClick={() => setSplit(null)}
-          />
-          <div className="detail-region" style={{ flexBasis: `${100 - effective}%` }}>
-            <ElementDetailPanel side={side} schema={current.name} />
-          </div>
+          {pane.detail ? (
+            <>
+              <div
+                className="splitter"
+                role="separator"
+                tabIndex={0}
+                aria-label={`resize the ${sideLabel(side)} side`}
+                aria-valuenow={Math.round(effective)}
+                aria-valuemin={MIN_SPLIT}
+                aria-valuemax={MAX_SPLIT}
+                title="Drag to resize, double-click to reset"
+                onPointerDown={drag}
+                onKeyDown={onSplitKey}
+                onDoubleClick={() => setSplit(null)}
+              />
+              {/* An empty detail region would be a third of the pane spent on one
+                  sentence. Until something is selected it is only that sentence,
+                  and the list has the rest. */}
+              <div
+                className="detail-region"
+                style={
+                  pane.selected === null
+                    ? { flex: "0 0 auto" }
+                    : { flexBasis: `${100 - effective}%` }
+                }
+              >
+                <ElementDetailPanel side={side} schema={current.name} />
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="detail-collapsed"
+              aria-label={`show the ${sideLabel(side)} element detail`}
+              onClick={() => dispatch(setDetail({ side, open: true }))}
+            >
+              <span className="subtle">
+                {pane.selected === null ? "No element selected" : pane.selected}
+              </span>
+              <span className="subtle">show detail</span>
+            </button>
+          )}
         </div>
       ) : (
         <UnsupportedNotice summary={current} />

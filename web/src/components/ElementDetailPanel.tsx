@@ -2,6 +2,7 @@ import { skipToken } from "@reduxjs/toolkit/query/react";
 import type { ReactNode } from "react";
 
 import { useElementQuery } from "../api";
+import { readableKey } from "../format";
 import type { Side } from "../panes";
 import { useAppDispatch, useAppSelector } from "../store";
 import type {
@@ -13,6 +14,8 @@ import type {
 } from "../types";
 import { selectElement } from "../uiSlice";
 
+import { Copyable } from "./Copyable";
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="field">
@@ -22,51 +25,70 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** A named section that stays out of the way until it is asked for. */
+function Section({
+  title,
+  count,
+  open = false,
+  children,
+}: {
+  title: string;
+  count?: number;
+  open?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="detail-section" open={open}>
+      <summary>
+        {title}
+        {count !== undefined && <span className="section-count">{count}</span>}
+      </summary>
+      <div className="detail-section-body">{children}</div>
+    </details>
+  );
+}
+
+function Absent({ what = "absent" }: { what?: string }) {
+  return <span className="subtle">{what}</span>;
+}
+
 function Json({ value }: { value: unknown }) {
-  if (value === null || value === undefined) return <span className="subtle">absent</span>;
+  if (value === null || value === undefined) return <Absent />;
   return <pre className="json">{JSON.stringify(value, null, 2)}</pre>;
 }
 
 function Diagnostics({ entries }: { entries: Diagnostic[] }) {
-  if (entries.length === 0) {
-    return (
-      <section>
-        <h3>Diagnostics</h3>
-        <p className="subtle">None reported for this element.</p>
-      </section>
-    );
-  }
   return (
-    <section>
-      <h3>Diagnostics ({entries.length})</h3>
-      <ul className="diagnostics">
-        {entries.map((entry, index) => (
-          <li key={`${entry.path}-${index}`}>
-            <span className={`badge status-${entry.status}`}>{entry.status}</span>
-            <span>{entry.reason}</span>
-            <code className="subtle">{entry.path}</code>
-            {entry.inherited === true && (
-              <span className="chip inherited">reported at the declaration</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Section title="Diagnostics" count={entries.length} open={entries.length > 0}>
+      {entries.length === 0 ? (
+        <p className="subtle">None reported for this element.</p>
+      ) : (
+        <ul className="diagnostics">
+          {entries.map((entry, index) => (
+            <li key={`${entry.path}-${index}`}>
+              <span className={`badge status-${entry.status}`}>{entry.status}</span>
+              <span>{entry.reason}</span>
+              <code className="subtle">{entry.path}</code>
+              {entry.inherited === true && (
+                <span className="chip inherited">reported at the declaration</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }
 
 function Paths({ paths }: { paths: string[] }) {
   return (
-    <section>
-      <h3>Snapshot paths ({paths.length})</h3>
+    <Section title="Snapshot paths" count={paths.length}>
       <p className="subtle">
         Contextual positions reached from a root through subsections. They are not element
         identifiers: one declaration appears at every path that reaches it.
       </p>
       {paths.length === 0 ? (
-        <p className="subtle">
-          Not reachable from a root by descending subsections in this document.
-        </p>
+        <p className="subtle">Not reachable from a root by descending subsections.</p>
       ) : (
         <ul className="paths">
           {paths.map((path) => (
@@ -76,39 +98,35 @@ function Paths({ paths }: { paths: string[] }) {
           ))}
         </ul>
       )}
-    </section>
+    </Section>
   );
 }
 
 function Snapshot({ snapshot }: { snapshot: ElementSnapshot | null }) {
   if (snapshot === null) return null;
   return (
-    <section>
-      <h3>Snapshot</h3>
+    <Section title="Snapshot">
       <Field label="name">{snapshot.name}</Field>
       <Field label="parent">
-        {snapshot.parent === null ? <span className="subtle">none</span> : <code>{snapshot.parent}</code>}
+        {snapshot.parent === null ? <Absent what="none" /> : <code>{snapshot.parent}</code>}
       </Field>
-      <Field label="range">{snapshot.range ?? <span className="subtle">absent</span>}</Field>
-      <Field label="unit">{snapshot.unit ?? <span className="subtle">absent</span>}</Field>
+      <Field label="range">{snapshot.range ?? <Absent />}</Field>
+      <Field label="unit">{snapshot.unit ?? <Absent />}</Field>
       <Field label="semantic type">
-        {snapshot.semantic_type ?? <span className="subtle">not stated by the source</span>}
+        {snapshot.semantic_type ?? <Absent what="not stated by the source" />}
       </Field>
-      <Field label="source version">
-        {snapshot.source_version ?? <span className="subtle">absent</span>}
-      </Field>
-    </section>
+      <Field label="source version">{snapshot.source_version ?? <Absent />}</Field>
+    </Section>
   );
 }
 
 function Parents({ parents, side }: { parents: ClassParent[]; side: Side }) {
   const dispatch = useAppDispatch();
   return (
-    <section>
-      <h3>Source parents ({parents.length})</h3>
+    <Section title="Source parents" count={parents.length}>
       <p className="subtle">
         Every direct base in source order. The first becomes the LinkML backbone; the rest become
-        mixins. The backbone alone is not the whole inheritance structure.
+        mixins.
       </p>
       {parents.length === 0 ? (
         <p className="subtle">No source base.</p>
@@ -129,7 +147,17 @@ function Parents({ parents, side }: { parents: ClassParent[]; side: Side }) {
           ))}
         </ol>
       )}
-    </section>
+    </Section>
+  );
+}
+
+/** The identifier line: the exact stored string, readable and copyable. */
+function Identity({ id, kind }: { id: string; kind: string }) {
+  return (
+    <div className="identity">
+      <code className="identifier">{id}</code>
+      <Copyable value={id} label={`the ${kind} identifier`} />
+    </div>
   );
 }
 
@@ -139,23 +167,19 @@ function ClassPanel({ detail, side }: { detail: ClassDetail; side: Side }) {
     <>
       <header className="detail-head">
         <span className="badge kind-class">class</span>
-        <h2>{detail.name}</h2>
-        <code className="subtle">{detail.key}</code>
-        <code className="identifier">{detail.id}</code>
+        <h3 className="detail-title">{detail.name}</h3>
+        <code className="subtle detail-key">{readableKey(detail.key)}</code>
       </header>
+      <Identity id={detail.id} kind="class" />
       {detail.description !== null && <p className="description">{detail.description}</p>}
-      <section>
-        <h3>Counts</h3>
+      <div className="summary-grid">
         <Field label="declared here">{detail.counts.local_attributes}</Field>
-        <Field label="effective attributes">{detail.counts.effective_attributes}</Field>
+        <Field label="effective">{detail.counts.effective_attributes}</Field>
         <Field label="of them inherited">{detail.counts.inherited_attributes}</Field>
-        <Field label="source version">
-          {detail.source_version ?? <span className="subtle">absent</span>}
-        </Field>
-      </section>
+        <Field label="source version">{detail.source_version ?? <Absent />}</Field>
+      </div>
       <Parents parents={detail.parents} side={side} />
-      <section>
-        <h3>All ancestors ({detail.ancestors.length})</h3>
+      <Section title="All ancestors" count={detail.ancestors.length}>
         {detail.ancestors.length === 0 ? (
           <p className="subtle">None.</p>
         ) : (
@@ -174,9 +198,8 @@ function ClassPanel({ detail, side }: { detail: ClassDetail; side: Side }) {
             ))}
           </ul>
         )}
-      </section>
-      <section>
-        <h3>Effective attributes ({detail.attributes.length})</h3>
+      </Section>
+      <Section title="Effective attributes" count={detail.attributes.length}>
         <ul className="attribute-list">
           {detail.attributes.map((row) => (
             <li key={row.id}>
@@ -194,7 +217,7 @@ function ClassPanel({ detail, side }: { detail: ClassDetail; side: Side }) {
             </li>
           ))}
         </ul>
-      </section>
+      </Section>
       <Diagnostics entries={detail.diagnostics} />
       <Snapshot snapshot={detail.snapshot} />
       <Paths paths={detail.snapshot_paths} />
@@ -221,15 +244,20 @@ function AttributePanel({
     <>
       <header className="detail-head">
         <span className="badge kind-attribute">attribute</span>
-        <h2>{detail.name}</h2>
-        <code className="subtle">
-          {detail.class.key}.{detail.name}
+        <h3 className="detail-title">{detail.name}</h3>
+        <code className="subtle detail-key">
+          {readableKey(detail.class.key)}.{detail.name}
         </code>
-        <code className="identifier">{detail.id}</code>
       </header>
+      <Identity id={detail.id} kind="attribute" />
       {detail.description !== null && <p className="description">{detail.description}</p>}
-      <section>
-        <h3>Provenance</h3>
+      <div className="summary-grid">
+        <Field label="range">
+          {detail.range === null ? <Absent /> : <code>{detail.range.name}</code>}
+        </Field>
+        <Field label="unit">
+          {detail.unit === null ? <Absent what="none" /> : <code>{detail.unit.ucum_code ?? "—"}</code>}
+        </Field>
         <Field label="seen on">
           <button
             type="button"
@@ -253,12 +281,14 @@ function AttributePanel({
             <span className="chip">declared here</span>
           )}
         </Field>
+      </div>
+      <Section title="Provenance">
         <Field label="declaration identifier">
           <code>{detail.declaration_id ?? "absent"}</code>
         </Field>
         <Field label="source effective reference">
           {detail.source_reference === null ? (
-            <span className="subtle">absent</span>
+            <Absent />
           ) : (
             <>
               <span className="chip">{detail.source_reference.kind}</span>
@@ -266,13 +296,12 @@ function AttributePanel({
             </>
           )}
         </Field>
-      </section>
+      </Section>
       <Parents parents={parents} side={side} />
-      <section>
-        <h3>Type</h3>
+      <Section title="Type">
         <Field label="range">
           {detail.range === null ? (
-            <span className="subtle">absent; the source type is not convertible</span>
+            <Absent what="absent; the source type is not convertible" />
           ) : (
             <>
               <code>{detail.range.name}</code> <span className="chip">{detail.range.kind}</span>
@@ -280,9 +309,7 @@ function AttributePanel({
                 <button
                   type="button"
                   className="link"
-                  onClick={() =>
-                    dispatch(selectElement({ side, id: detail.range?.target?.id ?? "" }))
-                  }
+                  onClick={() => dispatch(selectElement({ side, id: detail.range?.target?.id ?? "" }))}
                 >
                   {detail.range.target.name}
                 </button>
@@ -295,7 +322,7 @@ function AttributePanel({
         )}
         <Field label="unit">
           {detail.unit === null ? (
-            <span className="subtle">none</span>
+            <Absent what="none" />
           ) : (
             <>
               <code>{detail.unit.ucum_code ?? "no UCUM code"}</code>
@@ -306,11 +333,11 @@ function AttributePanel({
           )}
         </Field>
         <Field label="multivalued">
-          {detail.multivalued === null ? <span className="subtle">unset</span> : String(detail.multivalued)}
+          {detail.multivalued === null ? <Absent what="unset" /> : String(detail.multivalued)}
         </Field>
         <Field label="array">
           {detail.array === null ? (
-            <span className="subtle">scalar</span>
+            <Absent what="scalar" />
           ) : (
             <>
               {detail.array.exact_number_dimensions} dimension(s)
@@ -321,9 +348,8 @@ function AttributePanel({
             </>
           )}
         </Field>
-      </section>
-      <section>
-        <h3>Facets</h3>
+      </Section>
+      <Section title="Facets" count={facets.length}>
         {facets.length === 0 ? (
           <p className="subtle">
             None stated by the source. Facets are never inferred, so an absent facet means the
@@ -339,18 +365,21 @@ function AttributePanel({
         {detail.instantiates.length > 0 && (
           <Field label="instantiates">{detail.instantiates.join(", ")}</Field>
         )}
-      </section>
-      <section>
-        <h3>Source metadata</h3>
-        <Field label="kind">{detail.source.kind ?? <span className="subtle">absent</span>}</Field>
+      </Section>
+      <Section title="Source metadata">
+        <Field label="kind">{detail.source.kind ?? <Absent />}</Field>
         <Field label="type">
-          {detail.source.type === null ? <span className="subtle">absent</span> : <code>{detail.source.type}</code>}
+          {detail.source.type === null ? <Absent /> : <code>{detail.source.type}</code>}
         </Field>
         <Field label="shape">
-          {detail.source.shape === null ? <span className="subtle">scalar</span> : <code>{JSON.stringify(detail.source.shape)}</code>}
+          {detail.source.shape === null ? (
+            <Absent what="scalar" />
+          ) : (
+            <code>{JSON.stringify(detail.source.shape)}</code>
+          )}
         </Field>
         {detail.source.annotations !== null && <Json value={detail.source.annotations} />}
-      </section>
+      </Section>
       <Diagnostics entries={detail.diagnostics} />
       <Snapshot snapshot={detail.snapshot} />
       <Paths paths={detail.snapshot_paths} />

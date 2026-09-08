@@ -28,7 +28,7 @@ const BAM_ATTRIBUTE = `${BAM_CLASS}.value`;
 
 const SUMMARY = {
   name: SCHEMA,
-  title: "NOMAD fixture",
+  title: `NOMAD ${SCHEMA}`,
   status: "ok",
   error: null,
   schema_id: "https://w3id.org/schematerial/nomad/fixture",
@@ -55,7 +55,7 @@ const SUMMARY = {
 const BAM_SUMMARY = {
   ...SUMMARY,
   name: BAM,
-  title: "BAM fixture",
+  title: `BAM masterdata ${BAM}`,
   schema_id: "https://w3id.org/schematerial/bam/fixture",
   source: { package: "bam-masterdata", version: "0.13.1", dependencies: {} },
   cache_key: "0b0b",
@@ -321,8 +321,9 @@ async function bothSides() {
 describe("choosing what appears on either side", () => {
   it("opens with one schema from each source, one per side", async () => {
     await bothSides();
-    expect(screen.getByRole("heading", { name: "NOMAD fixture" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "BAM fixture" })).toBeDefined();
+    // The header names the source and the module, not the whole dotted path.
+    expect(screen.getByRole("heading", { name: "NOMAD · fixture" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "BAM masterdata · bam_fixture" })).toBeDefined();
     // Each side keeps the prefix its own adapter wrote.
     expect(options("left")[0]?.textContent).toContain("Base");
     expect(options("right")[0]?.textContent).toContain("Sample");
@@ -509,13 +510,49 @@ describe("identifiers", () => {
   it("reports both selections together without claiming anything about them", async () => {
     const user = userEvent.setup();
     await bothSides();
+    const strip = screen.getByRole("contentinfo", { name: "selected on each side" });
+
+    // Nothing can be authored from an incomplete pair.
+    expect(
+      (within(strip).getByRole("button", { name: "Create mapping" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
     await user.click(options("left")[3] as HTMLElement);
     await user.click(options("right")[1] as HTMLElement);
 
-    const bar = screen.getByRole("contentinfo", { name: "selected on each side" });
-    await waitFor(() => expect(within(bar).getByText(INHERITED)).toBeDefined());
-    expect(within(bar).getByText(BAM_ATTRIBUTE)).toBeDefined();
-    expect(within(bar).getByText(/Use selected pair to start a mapping draft/)).toBeDefined();
+    // Both identifiers exactly as stored, each readable and each copyable.
+    await waitFor(() => expect(within(strip).getByText(INHERITED)).toBeDefined());
+    expect(within(strip).getByText(BAM_ATTRIBUTE)).toBeDefined();
+    expect(within(strip).getByText("Child.value")).toBeDefined();
+    expect(within(strip).getByText("Sample.value")).toBeDefined();
+    expect(within(strip).getAllByRole("button", { name: /^copy the/ })).toHaveLength(2);
+
+    // The strip reads left to right until someone turns it round, and it still
+    // only reports a selection: the draft starts on the explicit action.
+    expect(within(strip).getAllByText(/^(subject|object)$/).map((node) => node.textContent)).toEqual(
+      ["subject", "object"],
+    );
+    expect(
+      (within(strip).getByRole("button", { name: "Create mapping" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+    expect(screen.queryByRole("dialog", { name: "mapping authoring" })).toBeNull();
+  });
+
+  it("turns the pair round before any form is opened", async () => {
+    const user = userEvent.setup();
+    await bothSides();
+    await user.click(options("left")[3] as HTMLElement);
+    await user.click(options("right")[1] as HTMLElement);
+    const strip = screen.getByRole("contentinfo", { name: "selected on each side" });
+
+    function ends(): string[] {
+      return Array.from(strip.querySelectorAll(".strip-end")).map(
+        (node) => node.querySelector(".strip-id")?.textContent ?? "",
+      );
+    }
+    await waitFor(() => expect(ends()).toEqual([INHERITED, BAM_ATTRIBUTE]));
+    await user.click(within(strip).getByRole("button", { name: "swap subject and object" }));
+    expect(ends()).toEqual([BAM_ATTRIBUTE, INHERITED]);
   });
 });
 
@@ -595,10 +632,19 @@ describe("the keyboard across two sides", () => {
 });
 
 describe("counts", () => {
-  it("labels each count separately on the side it belongs to", async () => {
+  it("keeps the counts out of the header until they are asked for", async () => {
+    const user = userEvent.setup();
     await bothSides();
+    const summary = within(pane("left")).getByLabelText(/^counts and diagnostics/);
+    const disclosure = summary.closest("details") as HTMLDetailsElement;
+
+    // Nothing about seven different totals is on screen while a list is read.
+    expect(disclosure.open).toBe(false);
+    await user.click(summary);
+    expect(disclosure.open).toBe(true);
+
     const counts = new Map(
-      Array.from(pane("left").querySelectorAll(".count")).map((node) => [
+      Array.from(disclosure.querySelectorAll(".count")).map((node) => [
         node.querySelector("dt")?.textContent ?? "",
         node.querySelector("dd")?.textContent ?? "",
       ]),

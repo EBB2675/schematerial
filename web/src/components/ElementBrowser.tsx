@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { useElementsQuery, useMappingsQuery } from "../api";
+import { rangeLabel } from "../format";
+import { mappingStates, type MappingState } from "../mappings";
 import { sideLabel, type Side } from "../panes";
 import { buildHaystacks, filterElements } from "../search";
 import { useAppDispatch, useAppSelector } from "../store";
@@ -23,6 +25,15 @@ const NO_ROWS: IndexRow[] = [];
 
 const number = new Intl.NumberFormat("en");
 
+/**
+ * One element, named the way a person names it.
+ *
+ * The readable name leads and gets the width. The type, the unit and the
+ * conversion notes are chips at the end because they answer a second question,
+ * and the stable identifier is not here at all: it is in the detail below,
+ * where it can be read in full and copied without a row having to be wide
+ * enough to hold it.
+ */
 function Row({
   row,
   selected,
@@ -31,7 +42,7 @@ function Row({
 }: {
   row: IndexRow;
   selected: boolean;
-  mappingState: string | undefined;
+  mappingState: MappingState | undefined;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -39,26 +50,39 @@ function Row({
       className={`row ${row.kind}${selected ? " selected" : ""}`}
       role="option"
       aria-selected={selected}
+      title={row.id}
       style={{ height: ROW_HEIGHT }}
       onMouseDown={() => onSelect(row.id)}
     >
-      <span className={`badge kind-${row.kind}`}>{row.kind === "class" ? "C" : "a"}</span>
+      <span className={`badge kind-${row.kind}`} aria-hidden="true">
+        {row.kind === "class" ? "C" : "a"}
+      </span>
       <span className="row-name">{row.name}</span>
-      {mappingState && <span className={`mapping-state ${mappingState}`}>{mappingState}</span>}
       {row.kind === "attribute" && <span className="row-owner">{row.class_name}</span>}
-      {row.range !== null && <span className="chip">{row.range}</span>}
-      {row.unit !== null && <span className="chip unit">{row.unit}</span>}
-      {row.multivalued && <span className="chip">many</span>}
-      {row.inherited && (
-        <span className="chip inherited" title="declared on an ancestor">
-          inherited
-        </span>
-      )}
-      {row.diagnostics > 0 && (
-        <span className="chip warn" title="conversion diagnostics">
-          {row.diagnostics}
-        </span>
-      )}
+      <span className="row-tail">
+        {mappingState !== undefined && (
+          <span className={`state ${mappingState}`} title={`In the crosswalk: ${mappingState}`}>
+            {mappingState}
+          </span>
+        )}
+        {row.range !== null && (
+          <span className="chip range" title={row.range}>
+            {rangeLabel(row.range)}
+          </span>
+        )}
+        {row.unit !== null && <span className="chip unit">{row.unit}</span>}
+        {row.multivalued && <span className="chip">many</span>}
+        {row.inherited && (
+          <span className="chip inherited" title="declared on an ancestor">
+            inherited
+          </span>
+        )}
+        {row.diagnostics > 0 && (
+          <span className="chip warn" title="conversion diagnostics">
+            {row.diagnostics}
+          </span>
+        )}
+      </span>
     </div>
   );
 }
@@ -82,17 +106,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
 
   const { data, isLoading, isError } = useElementsQuery(schema);
   const { data: mappings } = useMappingsQuery();
-  const mappingStates = useMemo(() => {
-    const states = new Map<string, string>();
-    const rank: Record<string, number> = { rejected: 1, suggested: 2, mapped: 3 };
-    for (const row of mappings?.rows ?? []) {
-      const status = row.review_status === "accepted" ? "mapped" : row.review_status;
-      for (const id of [row.subject_id, row.object_id]) {
-        if ((rank[status] ?? 0) > (rank[states.get(id) ?? ""] ?? 0)) states.set(id, status);
-      }
-    }
-    return states;
-  }, [mappings]);
+  const states = useMemo(() => mappingStates(mappings?.rows ?? []), [mappings]);
   const rows = data?.elements ?? NO_ROWS;
   const haystacks = useMemo(() => buildHaystacks(rows), [rows]);
   const filtered = useMemo(
@@ -170,6 +184,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
 
   const windowed = visibleRange(scrollTop, height, ROW_HEIGHT, filtered.length);
   const where = sideLabel(side);
+  const empty = !isLoading && !isError && filtered.length === 0;
 
   return (
     <div className="browser">
@@ -178,6 +193,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
           side={side}
           filters={filters}
           label={`search the ${where} side`}
+          placeholder={`search the ${where} side`}
           onQuery={(value) => dispatch(setQuery({ side, value }))}
           onKind={(value) => dispatch(setKind({ side, value }))}
           onInherited={(value) => dispatch(setOnlyInherited({ side, value }))}
@@ -194,7 +210,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
         {!isLoading &&
           !isError &&
           `${number.format(filtered.length)} of ${number.format(rows.length)} elements`}
-        {!linked && !isLoading && !isError && " · searched on its own"}
+        {!linked && !isLoading && !isError && " · own search"}
       </p>
       <div
         className="viewport"
@@ -212,7 +228,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
                 key={row.id}
                 row={row}
                 selected={row.id === selected}
-                mappingState={mappingStates.get(row.id)}
+                mappingState={states.get(row.id)}
                 onSelect={(id) => {
                   dispatch(activate(side));
                   dispatch(selectElement({ side, id }));
@@ -222,6 +238,13 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
           </div>
         </div>
       </div>
+      {empty && (
+        <p className="empty-state">
+          {rows.length === 0
+            ? "This schema has no browsable elements."
+            : "Nothing matches this search."}
+        </p>
+      )}
     </div>
   );
 }
