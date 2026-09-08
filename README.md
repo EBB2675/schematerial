@@ -14,8 +14,6 @@ cd schematerial
 uv sync
 ```
 
-`uv sync` creates the virtual environment in `.venv` and installs schematerial into that environment only, never onto your system. There is no separate `python -m venv` or `pip install` step. Put `uv run` in front of a command to use the environment, or activate it yourself with `source .venv/bin/activate`.
-
 ## Run it
 
 Three steps: build the interface, pull a schema out of a source package, then serve it.
