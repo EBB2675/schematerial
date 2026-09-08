@@ -10,16 +10,80 @@ from schematerial.facets import read_facets
 from schematerial.models import CoordinateFrame
 from schematerial.parsers._yaml_base import (
     ROOT_CLASS,
-    _detect_per_atom,
-    _infer_semantic_type,
     _parse_dtype,
     parse_yaml_schema,
 )
 from schematerial.parsers.base import Parser
 from schematerial.parsers.nomad import NomadParser
-from schematerial.semantics import semantic_types
 
-FIXTURES = Path(__file__).parent.parent / "fixtures"
+INLINE_SCHEMA = """# NOMAD Metainfo: DFT calculation results, SI units throughout
+# https://nomad-lab.eu/prod/v1/staging/docs/reference/archive.html
+
+name: "NOMAD Metainfo"
+version: "1.0"
+description: Prototype DFT fields with indexed source paths.
+
+fields:
+  - name: energy_total
+    path: run[0].calculation[-1].energy.total.value
+    dtype: float
+    unit: J
+    description: Total electronic energy (DFT SCF converged).
+
+  - name: energy_total_per_atom
+    path: run[0].calculation[-1].energy.total.value_per_atom
+    dtype: float
+    unit: J
+    description: Total energy divided by number of atoms.
+
+  - name: n_atoms
+    path: run[0].system[-1].atoms.n_atoms
+    dtype: int
+    unit: null
+    description: Number of atoms in the simulation cell.
+
+  - name: chemical_composition_reduced
+    path: run[0].system[-1].chemical_composition_reduced
+    dtype: str
+    unit: null
+    description: Reduced chemical formula in Hill order (e.g. "GaAs").
+
+  - name: lattice_vectors
+    path: run[0].system[-1].atoms.lattice_vectors
+    dtype: float[3][3]
+    unit: m
+    description: Bravais lattice vectors as a 3×3 matrix.
+
+  - name: atom_positions
+    path: run[0].system[-1].atoms.positions
+    dtype: float[N][3]
+    unit: m
+    description: Cartesian positions of each atom.
+
+  - name: atom_labels
+    path: run[0].system[-1].atoms.labels
+    dtype: str[N]
+    unit: null
+    description: Element symbol for each atom site.
+
+  - name: periodicity
+    path: run[0].system[-1].atoms.periodic
+    dtype: bool[3]
+    unit: null
+    description: Periodicity along each lattice direction.
+
+  - name: band_gap
+    path: run[0].calculation[-1].band_gap[0].value
+    dtype: float
+    unit: J
+    description: Electronic band gap. Zero for metals.
+
+  - name: energy_free
+    path: run[0].calculation[-1].energy.free.value
+    dtype: float
+    unit: J
+    description: Free energy F = E - TS. Distinct from total energy at finite temperature.
+"""
 
 
 # --- helpers ---
@@ -109,89 +173,6 @@ def test_parse_dtype_unrecognised_token_does_not_crash() -> None:
     assert result == ("float[M]", None)
 
 
-# --- semantic type inference ---
-
-
-def test_infer_energy() -> None:
-    result = _infer_semantic_type("energy_total", "run.calculation.energy.total", None)
-    assert result == semantic_types.ENERGY
-
-
-def test_infer_bandgap_beats_energy() -> None:
-    # "band_gap" must win over "energy" even if both appear in the text
-    result = _infer_semantic_type("band_gap", "calculation.band_gap.value", "Electronic band gap.")
-    assert result == semantic_types.BAND_GAP
-
-
-def test_infer_lattice_vectors_have_no_semantic_type() -> None:
-    """`lattice_parameter` covered cell lengths, cell angles and lattice
-    vectors; no single term covers all three. See decision record 002."""
-    result = _infer_semantic_type(
-        "lattice_vectors", "system.atoms.lattice_vectors", "Bravais lattice vectors."
-    )
-    assert result is None
-
-
-def test_infer_atomic_position() -> None:
-    result = _infer_semantic_type(
-        "atom_positions", "system.atoms.positions", "Cartesian positions of each atom."
-    )
-    assert result == semantic_types.ATOMIC_POSITION
-
-
-def test_infer_flag() -> None:
-    result = _infer_semantic_type(
-        "periodicity", "system.atoms.periodic", "Periodicity along each direction."
-    )
-    assert result is None
-
-
-def test_infer_identifier() -> None:
-    result = _infer_semantic_type(
-        "chemical_composition_reduced", "system.chemical_composition_reduced", None
-    )
-    assert result is None
-
-
-def test_infer_label() -> None:
-    result = _infer_semantic_type(
-        "atom_labels", "system.atoms.labels", "Element symbol for each atom site."
-    )
-    assert result is None
-
-
-def test_infer_cell_length_is_a_length() -> None:
-    """The prototype called this `lattice_parameter`, which has no term. A cell
-    edge length is a length, and that one does resolve."""
-    result = _infer_semantic_type("cell_length_a", "_cell_length_a", "a cell edge length.")
-    assert result == semantic_types.LENGTH
-
-
-def test_infer_cell_angle_has_no_semantic_type() -> None:
-    result = _infer_semantic_type("cell_angle_alpha", "_cell_angle_alpha", "Cell angle alpha.")
-    assert result is None
-
-
-def test_infer_generic_length() -> None:
-    result = _infer_semantic_type("bond_length", "structure.bond_length", "Bond length in Å.")
-    assert result == semantic_types.LENGTH
-
-
-# --- per_atom detection ---
-
-
-def test_per_atom_from_unit() -> None:
-    assert _detect_per_atom("energy", "eV/atom") is True
-    assert _detect_per_atom("energy", "J/atom") is True
-    assert _detect_per_atom("energy", "eV") is None
-
-
-def test_per_atom_from_name() -> None:
-    assert _detect_per_atom("energy_total_per_atom", "J") is True
-    assert _detect_per_atom("energy_per_atom", None) is True
-    assert _detect_per_atom("energy_total", None) is None
-
-
 # --- Protocol conformance ---
 
 
@@ -202,9 +183,16 @@ def test_parsers_satisfy_protocol() -> None:
 # --- NOMAD parser ---
 
 
-@pytest.fixture(scope="module")
-def nomad_schema() -> SchemaDefinition:
-    return NomadParser().parse(FIXTURES / "nomad_schema.yaml")
+@pytest.fixture
+def nomad_path(tmp_path: Path) -> Path:
+    path = tmp_path / "nomad_schema.yaml"
+    path.write_text(INLINE_SCHEMA)
+    return path
+
+
+@pytest.fixture
+def nomad_schema(nomad_path: Path) -> SchemaDefinition:
+    return NomadParser().parse(nomad_path)
 
 
 def test_nomad_format(nomad_schema: SchemaDefinition) -> None:
@@ -222,7 +210,7 @@ def test_nomad_energy_total(nomad_schema: SchemaDefinition) -> None:
     assert f.path == "run[0].calculation[-1].energy.total.value"
     assert f.range == "float"
     assert f.unit == "J"
-    assert f.semantic_type == semantic_types.ENERGY
+    assert f.semantic_type is None
     assert f.per_atom is None
     assert f.shape is None
     assert f.multivalued is False
@@ -230,12 +218,12 @@ def test_nomad_energy_total(nomad_schema: SchemaDefinition) -> None:
 
 def test_nomad_energy_total_per_atom(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "energy_total_per_atom")
-    assert f.per_atom is True
-    assert f.semantic_type == semantic_types.ENERGY
+    assert f.per_atom is None
+    assert f.semantic_type is None
 
 
 def test_nomad_band_gap(nomad_schema: SchemaDefinition) -> None:
-    assert _get(nomad_schema, "band_gap").semantic_type == semantic_types.BAND_GAP
+    assert _get(nomad_schema, "band_gap").semantic_type is None
 
 
 def test_nomad_lattice_vectors(nomad_schema: SchemaDefinition) -> None:
@@ -247,8 +235,8 @@ def test_nomad_lattice_vectors(nomad_schema: SchemaDefinition) -> None:
 
 def test_nomad_atom_positions(nomad_schema: SchemaDefinition) -> None:
     f = _get(nomad_schema, "atom_positions")
-    assert f.semantic_type == semantic_types.ATOMIC_POSITION
-    assert f.coordinate_frame == CoordinateFrame.cartesian
+    assert f.semantic_type is None
+    assert f.coordinate_frame is None
     assert f.shape == ["N", 3]
 
 
@@ -279,8 +267,8 @@ def test_nomad_source_file(nomad_schema: SchemaDefinition) -> None:
 # --- str path input ---
 
 
-def test_parser_accepts_str_path() -> None:
-    schema = NomadParser().parse(str(FIXTURES / "nomad_schema.yaml"))
+def test_parser_accepts_str_path(nomad_path: Path) -> None:
+    schema = NomadParser().parse(str(nomad_path))
     assert schema.id.endswith("/nomad")
 
 
@@ -299,3 +287,42 @@ def test_parse_yaml_schema_rejects_empty(tmp_path: Path) -> None:
     empty.write_text("")
     with pytest.raises(ValueError, match="expected a mapping"):
         parse_yaml_schema(empty, format="nomad")
+
+
+def test_explicit_facets_survive_loading(tmp_path: Path) -> None:
+    from schematerial.loading import load_schema
+
+    path = tmp_path / "explicit.yaml"
+    path.write_text('''name: explicit
+version: "2"
+fields:
+  - name: energy
+    path: A.energy
+    dtype: float
+    facets:
+      semantic_type: unfamiliar:Energy
+      coordinate_frame: fractional
+      per_atom: false
+      spin_channel: 0
+      unit_normalized: J
+''')
+    loaded = load_schema(NomadParser(), path, "nomadsim")
+    facets = read_facets(attributes_of(class_of(loaded.schema, "Root"))["energy"])
+    assert facets.semantic_type == "unfamiliar:Energy"
+    assert facets.coordinate_frame == CoordinateFrame.fractional
+    assert facets.per_atom is False
+    assert facets.spin_channel == 0
+    assert facets.unit_normalized == "J"
+    assert loaded.snapshots["nomadsim:Root.energy"].semantic_type == "unfamiliar:Energy"
+    assert loaded.snapshots["nomadsim:Root.energy"].source_version == "2"
+
+
+def test_duplicate_fields_report_both_source_paths(tmp_path: Path) -> None:
+    path = tmp_path / "duplicate.yaml"
+    path.write_text('''name: duplicate
+fields:
+  - {name: energy, path: A.energy, dtype: float}
+  - {name: energy, path: B.energy, dtype: int}
+''')
+    with pytest.raises(ValueError, match="A.energy.*B.energy"):
+        NomadParser().parse(path)
