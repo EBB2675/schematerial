@@ -316,6 +316,35 @@ def nomad_document() -> dict[str, Any]:
                 {"name": "value", "kind": "quantity", "declaring_class_id": "Run"}]}]}
 
 
+def test_the_converted_schema_loads_in_the_preview_alongside_nomad(tmp_path: Path) -> None:
+    from schematerial.web.preview import ingest
+
+    def write(doc: dict[str, Any], name: str) -> Path:
+        path = tmp_path / name
+        path.write_text(json.dumps(boundary(doc)), encoding="utf-8")
+        return path
+
+    bam = document(
+        cls("Instrument", [prop("name", code="$NAME")], code="INSTRUMENT"),
+        cls("Camera", [prop("resolution", "INTEGER")], ["Instrument"],
+            [ref("Instrument", "name"), ref("Camera", "resolution")], code="CAMERA.INSTRUMENT"),
+    )
+    previews = ingest([write(bam, "bam.json"), write(nomad_document(), "nomad.json")])
+    assert [preview.name for preview in previews] == ["fixture", "nomad_fixture"]
+    assert all(preview.status == "ok" for preview in previews)
+    masterdata, nomad = previews
+    assert masterdata.summary["source"]["package"] == "bam-masterdata"
+    assert masterdata.summary["counts"]["effective_attributes"] == 3
+    # Each import keeps the decision 1 prefix its own adapter wrote.
+    assert all(parse_element_id(row["id"]).source == "bammd" for row in masterdata.index)
+    assert all(parse_element_id(row["id"]).source == "nomadsim" for row in nomad.index)
+    # The inherited property is browsable on the subclass, with its declaring class.
+    inherited = masterdata.details[element_id("bammd", ("Camera", "name"))]
+    assert inherited["inherited"] is True
+    assert inherited["declared_in"]["id"] == element_id("bammd", ("Instrument",))
+    assert inherited["source"]["annotations"]["property_code"] == "$NAME"
+
+
 def test_the_adapter_needs_no_source_package_and_the_runner_names_a_missing_one(
     tmp_path: Path,
 ) -> None:
