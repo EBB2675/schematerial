@@ -1,4 +1,4 @@
-# Manual crosswalk authoring (Card 12)
+# Manual crosswalk authoring
 
 Build the frontend with `cd web && npm run build`. From the repository root:
 
@@ -61,7 +61,14 @@ object-type elements, each with a prepared mapping snapshot, plus the review
 session, empty mapping store and built client. No real scientific mappings were
 created by those smoke checks.
 
-See decision 008 for the trusted-local-operator boundary and its limitations.
+The review routes answer on loopback only, and only to same-origin submissions
+carrying a session-bound token. They validate the submitted identifiers against
+the prepared schema tables and capture the snapshots on the server, so a caller
+cannot supply its own. This is a trusted-local-operator model, not an
+authorisation system: it stops another website issuing writes, and it does not
+authenticate a person against another process run by the same operator. Serving
+writes beyond loopback would need an authentication and review-permission design
+first.
 
 
 To fix a saved decision, choose **Correct mapping** in the Mappings view, enter your author identity

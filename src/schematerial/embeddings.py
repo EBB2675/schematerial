@@ -1,8 +1,8 @@
-"""The side index embeddings live in. Decision 10.
+"""The side index embeddings live in.
 
-`embedding` used to be a field on `SchemaField`. Decision 10 bans it from the
-core IR: the materialisation cache in Card 4 keys on a content hash over the
-schema, and a vector on an element makes that key move whenever a model is
+`embedding` used to be a field on `SchemaField`. Nothing large or volatile
+belongs in the core IR: the materialisation cache keys on a content hash over
+the schema, and a vector on an element makes that key move whenever a model is
 re-run. So vectors live here instead, keyed by element id, and an element
 serialises to no vector data at all.
 

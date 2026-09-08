@@ -43,7 +43,7 @@ testpaths = ["tests"]
 [tool.ruff]
 src = ["src"]
 # models/ is generated output. Formatting it would make the tree disagree with
-# what `uv run schematerial-schema` produces, which is a Card 3 invariant.
+# what `uv run schematerial-schema` produces.
 extend-exclude = ["src/schematerial/models"]
 line-length = 100
 target-version = "py312"

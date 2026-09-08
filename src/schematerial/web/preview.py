@@ -148,7 +148,7 @@ def _class_reference(
 
 
 def _source_prefix(imported: SchemaImport) -> str:
-    """The decision 1 prefix this adapter wrote, read back off its own output.
+    """The source prefix this adapter wrote, read back off its own output.
 
     Taking it from the import rather than naming a source here is what keeps the
     preview usable by a second adapter. Declarations and snapshot keys must

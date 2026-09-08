@@ -1,4 +1,4 @@
-"""Card 3: the LinkML schema is the source of truth, models/ is generated."""
+"""The LinkML schema is the source of truth, models/ is generated."""
 
 import subprocess
 import sys
@@ -82,7 +82,7 @@ def test_stale_detection_covers_the_whole_generated_package(
 
 
 def test_the_generated_file_records_the_pins(tmp_path: Path) -> None:
-    """Decision 9: pins are recorded in the header of every generated schema."""
+    """The toolchain pins are recorded in the header of every generated schema."""
     content = generator.generate(target=tmp_path / "core.py")
     header = content.split("\n\n", 1)[0]
     assert "DO NOT EDIT" in header
@@ -101,9 +101,9 @@ def test_nothing_outside_models_defines_a_model_class() -> None:
     subclasses BaseModel would be a hand-written mirror of the schema.
     """
     exempt = {
-        SRC / "semantics" / "ontology.py",  # grounding proposals, decision record 002
-        SRC / "identity.py",  # ElementSnapshot, decision 2
-        SRC / "mappings" / "store.py",  # SSSOM rows, not canonical schema elements (decision 6)
+        SRC / "semantics" / "ontology.py",  # grounding proposals, not schema structure
+        SRC / "identity.py",  # ElementSnapshot, stored beside an element, never in it
+        SRC / "mappings" / "store.py",  # SSSOM rows, not canonical schema elements
     }
     offenders = []
     for path in sorted(SRC.rglob("*.py")):

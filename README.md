@@ -80,7 +80,4 @@ uv run schematerial-schema --check   # generated models match the schema
 - [Schema aligner](docs/schema-preview.md)
 
 - [Materialisation cache](docs/materialisation-cache.md)
-- [Annotations, ontology terms, and semantic types](docs/decisions/002-annotations-ontology-terms-and-semantic-types.md)
-- [Web layer decisions](docs/decisions/004-web-layer.md)
-- [Structural graph view decisions](docs/decisions/006-structural-graph-view.md)
-- [BAM masterdata conversion decisions](docs/decisions/005-bam-masterdata-linkml-conversion.md)
+- [Manual crosswalk authoring](docs/manual-crosswalks.md)

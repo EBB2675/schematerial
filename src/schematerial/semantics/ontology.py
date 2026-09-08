@@ -1,12 +1,12 @@
 """Ontology records. App records, deliberately not part of the LinkML core.
 
 `OntologyTerm` is a *grounding proposal*: a URI, a match type and a confidence.
-Decision 11 makes that a suggestion rather than a fact, and Card 20 is what
-produces it. A proposal with a confidence is not schema structure, so it does
-not go in the core and it is no longer a field on `SchemaField`; the core
-carries only an accepted `semantic_type` CURIE in annotations, per decision 4.
+That is a suggestion rather than a fact. A proposal with a confidence is not
+schema structure, so it does not go in the core and it is no longer a field on
+`SchemaField`; the core carries only an accepted `semantic_type` CURIE in
+annotations.
 
-It lives outside `models/` because Card 3 makes `models/` generated output.
+It lives outside `models/` because `models/` is generated output.
 """
 
 from typing import Literal
@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field
 class OntologyTerm(BaseModel):
     """A proposed grounding of a schema element to an ontology concept.
 
-    Never written onto an element. Card 20 emits these; acceptance is a human
-    act (decision 11), and what acceptance writes is a `semantic_type` CURIE.
+    Never written onto an element. A matcher emits these; acceptance is a human
+    act, and what acceptance writes is a `semantic_type` CURIE.
     """
 
     uri: str

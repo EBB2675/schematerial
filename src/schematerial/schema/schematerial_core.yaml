@@ -12,7 +12,7 @@ description: >-
   that needs redefining here, and this schema does not redefine it.
 
 
-  What LinkML has no room for is the five facets of decision 4. Assigning a
+  What LinkML has no room for is the five materials facets. Assigning a
   non-metamodel slot to a schema element is an error, and there is no way to add
   slots to SlotDefinition, so the facets live in `annotations` and this class is
   what governs them. An element carrying facets points at it through
@@ -21,7 +21,7 @@ description: >-
 
 
   A facet with no value is absent. Every slot below is optional and none has a
-  default, because a default would be a guess and decision 4 forbids guessing.
+  default, because a default would be a guess and a guess is never carried.
 
 license: https://spdx.org/licenses/MIT.html
 

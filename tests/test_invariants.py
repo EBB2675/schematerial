@@ -1,7 +1,7 @@
-"""Invariants CI enforces. AGENTS.md: these rules are not self-enforcing.
+"""Invariants CI enforces. These rules are not self-enforcing.
 
-Decision 11: no tool writes a mapping with accepted status, at any score.
-Card 2: `grep` finds no `TransformOp` and no threshold constant in the tree.
+No tool writes a mapping with accepted status, at any score, and `grep` finds no
+`TransformOp` and no threshold constant in the tree.
 
 Do not weaken these.
 """
@@ -14,10 +14,9 @@ import pytest
 
 REPO = Path(__file__).parent.parent
 
-# AGENTS.md and the decision records quote the banned names in order to ban
-# them. Everything else is real code and is in scope.
+# AGENTS.md quotes the banned names in order to ban them. Everything else that
+# is tracked is real code and is in scope.
 DOC_EXEMPT = {"AGENTS.md"}
-DOC_EXEMPT_DIRS = ("docs/decisions/",)
 
 
 def _tracked_files() -> list[str]:
@@ -28,9 +27,7 @@ def _tracked_files() -> list[str]:
         text=True,
         check=True,
     ).stdout.split()
-    return [
-        path for path in listing if path not in DOC_EXEMPT and not path.startswith(DOC_EXEMPT_DIRS)
-    ]
+    return [path for path in listing if path not in DOC_EXEMPT]
 
 
 def _grep(pattern: str) -> list[str]:
@@ -48,14 +45,14 @@ def _grep(pattern: str) -> list[str]:
     return hits
 
 
-# --- decision 11: no code path writes accepted status ------------------------
+# --- no code path writes accepted status -------------------------------------
 
 
 @pytest.mark.parametrize("banned", ["auto_accepted", "AUTO_ACCEPTED", "MappingStatus"])
 def test_no_code_path_writes_accepted_status(banned: str) -> None:
     hits = [hit for hit in _grep(banned) if not hit.startswith("tests/test_invariants.py")]
     assert hits == [], (
-        f"decision 11: acceptance is a human act, no tool writes it. Found {banned!r}:\n"
+        f"acceptance is a human act, no tool writes it. Found {banned!r}:\n"
         + "\n".join(hits)
     )
 
@@ -66,17 +63,17 @@ def test_no_status_is_derived_from_a_score() -> None:
         for hit in _grep("_derive_status_from_score")
         if not hit.startswith("tests/test_invariants.py")
     ]
-    assert hits == [], "decision 11: thresholds are a caller's concern, not a field on a record."
+    assert hits == [], "thresholds are a caller's concern, not a field on a record."
 
 
-# --- Card 2: no TransformOp, no threshold constant ---------------------------
+# --- no TransformOp, no threshold constant -----------------------------------
 
 
 @pytest.mark.parametrize("banned", ["TransformOp", "UnitConversionOp", "PerAtomRescaleOp"])
 def test_no_transform_op_survives(banned: str) -> None:
     hits = [hit for hit in _grep(banned) if not hit.startswith("tests/test_invariants.py")]
     assert hits == [], (
-        f"transformations become linkml-map in Card 19. Found {banned!r}:\n" + "\n".join(hits)
+        f"transformations become a linkml-map side-car. Found {banned!r}:\n" + "\n".join(hits)
     )
 
 
@@ -92,7 +89,7 @@ def test_no_threshold_constant_survives(threshold: str) -> None:
     )
 
 
-# --- decision 8: no source package in the app's import graph -----------------
+# --- no source package in the app's import graph -----------------------------
 
 
 @pytest.mark.parametrize("package", ["nomad", "bam_masterdata"])
@@ -101,7 +98,7 @@ def test_no_source_package_is_imported(package: str) -> None:
         hit for hit in _grep(f"import {package}") if not hit.startswith("tests/test_invariants.py")
     ]
     assert hits == [], (
-        f"decision 8: {package!r} is never a dependency of the app. Found:\n" + "\n".join(hits)
+        f"{package!r} is never a dependency of the app. Found:\n" + "\n".join(hits)
     )
 
 
@@ -132,7 +129,7 @@ def source_imports(code: str) -> list[str]:
 def test_app_has_no_structural_source_imports() -> None:
     for path in (REPO / "src" / "schematerial").rglob("*.py"):
         if "extractors" in path.relative_to(REPO / "src" / "schematerial").parts:
-            continue  # Card 5 runner must keep these outside the app import graph.
+            continue  # The extractor runner keeps these outside the app import graph.
         assert source_imports(path.read_text()) == [], str(path)
 
 

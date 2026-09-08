@@ -1,7 +1,7 @@
-"""Reading, writing and validating the decision 4 facets on a LinkML element.
+"""Reading, writing and validating the materials facets on a LinkML element.
 
-Decision 4: `semantic_type`, `coordinate_frame`, `per_atom`, `spin_channel` and
-`unit_normalized` live in `annotations`, governed by a metamodel extension class
+`semantic_type`, `coordinate_frame`, `per_atom`, `spin_channel` and
+`unit_normalized` all live in `annotations`, governed by a metamodel extension class
 referenced through `instantiates`. That is the only mechanism LinkML offers --
 assigning a non-metamodel slot to a schema element is an error, and there is no
 way to add slots to `SlotDefinition`.
@@ -86,9 +86,9 @@ def _as_int(raw: object) -> int | None:
 def write_facets(element: Element, facets: MaterialsFacets) -> None:
     """Write the facets that have a value, and point `instantiates` at the class.
 
-    A facet set to None writes no annotation, per decision 4. An element given
-    no facets at all is left untouched, `instantiates` included -- pointing at
-    the extension class while carrying nothing would be a lie.
+    A facet set to None writes no annotation. An element given no facets at all
+    is left untouched, `instantiates` included -- pointing at the extension
+    class while carrying nothing would be a lie.
     """
     written = False
     for tag in FACET_TAGS:
@@ -146,8 +146,8 @@ def facet_problems(element: Element, element_name: str) -> list[str]:
     if present and MATERIALS_FACETS_CURIE not in instantiates:
         problems.append(
             f"{element_name}: carries facets {sorted(present)} but does not instantiate "
-            f"{MATERIALS_FACETS_CURIE}. Decision 4 is what makes the annotations legible; "
-            f"without it they are five loose tags."
+            f"{MATERIALS_FACETS_CURIE}. The extension class is what makes the annotations "
+            f"legible; without it they are five loose tags."
         )
 
     if MATERIALS_FACETS_CURIE in instantiates and not present:

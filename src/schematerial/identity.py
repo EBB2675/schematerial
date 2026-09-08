@@ -1,4 +1,4 @@
-"""Element identity and snapshot. Decisions 1 and 2.
+"""Element identity and snapshot.
 
 Every schema element gets a stable CURIE, ``<prefix>:<QualifiedName>``, where
 the qualified name is the dotted path from the top-level class. The path is a
@@ -50,11 +50,11 @@ __all__ = [
 
 
 class Source(StrEnum):
-    """The prefix map of decision 1: a source, and the prefix that names it.
+    """The prefix map: a source, and the prefix that names it.
 
-    URI expansions are deliberately absent. Decision 1 fixes the prefixes and
-    says nothing about what they expand to, and nothing before the SSSOM store
-    needs an expansion. The ``curie_map`` is Card 9's problem.
+    URI expansions are deliberately absent. The prefixes are fixed here and
+    nothing is said about what they expand to, because nothing before the SSSOM
+    store needs an expansion. The ``curie_map`` belongs to that store.
     """
 
     NOMAD_SIMULATION = "nomadsim"
@@ -72,7 +72,7 @@ class IdentityError(ValueError):
 
 
 class UnknownPrefixError(IdentityError):
-    """A source prefix outside the decision 1 prefix map."""
+    """A source prefix outside the prefix map."""
 
 
 class QualifiedNameError(IdentityError):
@@ -106,7 +106,7 @@ def _check_prefix(source: str) -> str:
     prefix = str(source)
     if prefix not in PREFIXES:
         raise UnknownPrefixError(
-            f"unknown source prefix {prefix!r}. Decision 1 fixes the prefix map: "
+            f"unknown source prefix {prefix!r}. The prefix map is fixed: "
             f"{', '.join(PREFIXES)}."
         )
     return prefix
@@ -122,7 +122,7 @@ def _check_segment(segment: str, *, within: str) -> str:
     if _INDEX.search(segment):
         raise QualifiedNameError(
             f"qualified name {within!r} contains an index in segment {segment!r}. "
-            f"An element id is a schema path, not an instance path (decision 1): "
+            f"An element id is a schema path, not an instance path: "
             f"'Run.calculation.energy.total.value', never "
             f"'run[0].calculation[-1].energy.total.value'. Whatever the index meant "
             f"is a cardinality on the slot or a note on a mapping row, never part of an id."
@@ -222,9 +222,9 @@ def parse_element_id(value: str) -> ParsedElementId:
 class ElementSnapshot(BaseModel):
     """What an element looked like in the source version it was seen in.
 
-    Decision 2: a record, not a hash. It is stored next to the element id, never
-    inside it, and it stays valid after the element it describes has moved or
-    been renamed -- which is the whole point of keeping it.
+    A record, not a hash. It is stored next to the element id, never inside it,
+    and it stays valid after the element it describes has moved or been renamed
+    -- which is the whole point of keeping it.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -242,11 +242,11 @@ class ElementSnapshot(BaseModel):
     """The unit as the source stated it."""
 
     semantic_type: str | None = None
-    """A CURIE into QUDT, EMMO or PMDco (decision 4). Absent when unstated."""
+    """A CURIE into QUDT, EMMO or PMDco. Absent when unstated."""
 
     source_version: str | None = None
-    """The version of the source package the element was seen in (decision 1:
-    the id does not carry it, the snapshot does)."""
+    """The version of the source package the element was seen in. The id does
+    not carry it; the snapshot does."""
 
 
 def capture_snapshot(
@@ -271,7 +271,7 @@ def capture_snapshot(
 
 
 def _roots(schema: SchemaDefinition) -> list[str]:
-    """The top-level classes decision 1's dotted path starts from.
+    """The top-level classes a qualified name's dotted path starts from.
 
     Explicit `tree_root` classes and classes never used as attribute ranges
     are roots. The walker adds an entry point for any remaining disconnected
@@ -310,10 +310,9 @@ def _snapshot_of(
 def _walk(schema: SchemaDefinition) -> Iterator[tuple[Sequence[str], ElementSnapshot]]:
     """Every element, as the segments of its qualified name and its snapshot.
 
-    Nesting is a slot whose range is a class (decision 3 and Card 7), so the
-    walk follows those ranges. A class already on the current path is not
-    followed again: a self-referential schema is legal and must not produce an
-    infinite path.
+    Nesting is a slot whose range is a class, so the walk follows those ranges.
+    A class already on the current path is not followed again: a
+    self-referential schema is legal and must not produce an infinite path.
     """
     classes = {str(name): definition for name, definition in classes_of(schema).items()}
     version = None if schema.version is None else str(schema.version)

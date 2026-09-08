@@ -1,4 +1,4 @@
-"""Reading, writing and validating the decision 4 facets."""
+"""Reading, writing and validating the materials facets."""
 
 from pathlib import Path
 
@@ -121,7 +121,7 @@ def test_a_good_element_has_no_problems() -> None:
 
 
 def test_facets_without_instantiates_are_reported() -> None:
-    """Decision 4's mechanism is the reference, not the tags on their own."""
+    """The mechanism is the reference, not the tags on their own."""
     attribute = _annotated(per_atom="true")
     problems = facet_problems(attribute, "System.positions")
     assert len(problems) == 1

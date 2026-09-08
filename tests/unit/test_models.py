@@ -1,4 +1,4 @@
-"""The generated model, and the facets it defines. Card 3."""
+"""The generated model, and the facets it defines."""
 
 import importlib
 
@@ -16,7 +16,7 @@ from schematerial.models import (
 from schematerial.semantics import semantic_types
 from schematerial.semantics.ontology import OntologyConcept, OntologyModel, OntologyTerm
 
-# --- the facets of decision 4 ------------------------------------------------
+# --- the materials facets ----------------------------------------------------
 
 
 def test_card_2_core_concepts_are_linkml_metamodel_aliases() -> None:
@@ -79,7 +79,7 @@ def test_aliases_are_curies_into_the_decision_4_vocabularies() -> None:
 
 
 def test_the_six_unresolved_prototype_values_have_no_alias() -> None:
-    """Dropped deliberately; see decision record 002."""
+    """Dropped deliberately; `semantic_types` names each one and why."""
     for dropped in ("lattice_parameter", "k_point", "identifier", "label", "flag", "unknown"):
         assert dropped not in semantic_types.SEMANTIC_TYPE_ALIASES
 
@@ -96,7 +96,7 @@ def test_the_alias_table_is_not_mutable() -> None:
         semantic_types.SEMANTIC_TYPE_ALIASES["energy"] = "nope"  # type: ignore[index]
 
 
-# --- no vector data in the core (decision 10) --------------------------------
+# --- no vector data in the core ----------------------------------------------
 
 
 def test_the_core_carries_no_vector_field() -> None:

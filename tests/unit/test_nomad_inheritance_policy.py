@@ -1,6 +1,6 @@
 """Pinned-runtime evidence, not an adapter or a NOMAD resolution implementation.
 
-NOMAD expectations were captured by the isolated probe linked in decision 003.
+NOMAD expectations were captured by an isolated probe against the pinned runtime.
 All schema definitions here are inline; no NOMAD import or environment is needed.
 """
 

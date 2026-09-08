@@ -1,6 +1,6 @@
 # DO NOT EDIT. Generated from schematerial_core.yaml by `uv run schematerial-schema`.
 #
-# Pinned versions this file was generated against (decision 9):
+# Pinned versions this file was generated against:
 #   linkml==1.11.1
 #   linkml-runtime==1.11.1
 #   linkml-map==0.5.2
@@ -85,7 +85,7 @@ linkml_meta = LinkMLMeta({'default_prefix': 'smat',
                     'ucum_code, a repeat is multivalued. None of that needs '
                     'redefining here, and this schema does not redefine it.\n'
                     '\n'
-                    'What LinkML has no room for is the five facets of decision 4. '
+                    'What LinkML has no room for is the five materials facets. '
                     'Assigning a non-metamodel slot to a schema element is an '
                     'error, and there is no way to add slots to SlotDefinition, so '
                     'the facets live in `annotations` and this class is what '
@@ -95,7 +95,7 @@ linkml_meta = LinkMLMeta({'default_prefix': 'smat',
                     '\n'
                     'A facet with no value is absent. Every slot below is optional '
                     'and none has a default, because a default would be a guess '
-                    'and decision 4 forbids guessing.',
+                    'and a guess is never carried.',
      'id': 'https://w3id.org/schematerial/core',
      'imports': ['linkml:types'],
      'license': 'https://spdx.org/licenses/MIT.html',

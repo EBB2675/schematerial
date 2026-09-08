@@ -1,4 +1,4 @@
-"""Card 9: real SSSOM parsing, durable identities and automated-write constraints."""
+"""Real SSSOM parsing, durable identities and automated-write constraints."""
 from pathlib import Path
 
 import pytest
