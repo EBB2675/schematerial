@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { CrosswalkPanel } from "./components/CrosswalkPanel";
 import { ElementBrowser } from "./components/ElementBrowser";
+import { PmdcoPanel } from "./components/PmdcoPanel";
 import { createStore } from "./store";
 import type { IndexRow, MappingRow } from "./types";
 import { chooseSchema, selectElement } from "./uiSlice";
@@ -32,6 +33,16 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const request = input as Request;
     const path = new URL(request.url).pathname;
+    if (path === "/api/pmdco") return Response.json({
+      schema: "pmdco", version: "3.1.0", version_iri: "https://w3id.org/pmd/co/3.1.0",
+      term_count: 2, anchor_count: 1, terms: [
+        { id: "https://example.org/Entity", uri: "https://example.org/Entity", label: "Entity",
+          definition: null, synonyms: [], parents: [], anchorable: false, deprecated: false },
+        { id: "pmdco:Material", uri: "https://w3id.org/pmd/co/Material", label: "Material",
+          definition: "Matter used in a process", synonyms: ["substance"],
+          parents: ["https://example.org/Entity"], anchorable: true, deprecated: false },
+      ],
+    });
     if (path === "/api/mappings") { reads++; return Response.json({ rows: saved }); }
     if (path === "/api/review-session") return Response.json({ token: "session-token" });
     if (path.includes("/elements")) return Response.json({ schema: path.includes("nomad") ? "nomad" : "bam",
@@ -58,7 +69,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-async function mount() {
+async function mount(withOntology = false) {
   const store = createStore();
   store.dispatch(chooseSchema({ side: "left", schema: "nomad" }));
   store.dispatch(chooseSchema({ side: "right", schema: "bam" }));
@@ -66,6 +77,7 @@ async function mount() {
     <ElementBrowser side="left" schema="nomad" />
     <ElementBrowser side="right" schema="bam" />
     <CrosswalkPanel />
+    {withOntology && <PmdcoPanel />}
   </Provider>);
   await waitFor(() => expect(screen.getAllByRole("listbox").flatMap(
     (list) => within(list).queryAllByRole("option"))).toHaveLength(2));
@@ -150,4 +162,57 @@ it.each(["accept", "reject"] as const)("requires explicit %s after opening a sug
   expect(posts[0]?.body.action).toBe(action);
   await waitFor(() => expect(screen.queryByRole("button", { name: "Review suggestion" })).toBeNull());
   expect(saved[0]?.review_status).toBe(action === "accept" ? "accepted" : "rejected");
+});
+
+
+it("keeps a direct mapping and both PMDco anchors together through the manual workflow", async () => {
+  await mount(true);
+  const user = await draft();
+  await user.click(screen.getByRole("button", { name: "Save accepted mapping" }));
+  await waitFor(() => expect(saved).toHaveLength(1));
+  const ontology = screen.getByRole("complementary", { name: "PMDco taxonomy" });
+  const search = within(ontology).getByLabelText("Search PMDco");
+  await user.type(search, "substance");
+  await user.click(await within(ontology).findByRole("button", { name: "Material" }));
+  expect(within(ontology).getByText("Matter used in a process")).toBeDefined();
+  for (const side of ["left", "right"] as const) {
+    const before = posts.length;
+    await user.click(within(ontology).getByRole("button", { name: `Anchor ${side} selection` }));
+    expect(posts).toHaveLength(before);
+    expect(screen.getByRole("status").textContent).toBe("Unsaved changes");
+    await user.type(screen.getByLabelText("Author URI or ORCID"), "https://example.org/human");
+    await user.type(screen.getByLabelText("Justification"), `Reviewed ${side} PMDco anchor`);
+    await user.click(screen.getByRole("button", { name: "Save accepted mapping" }));
+    await waitFor(() => expect(posts).toHaveLength(before + 1));
+    expect(posts.at(-1)?.body.subject_id).toBe(side === "left" ? NOMAD : BAM);
+    expect(posts.at(-1)?.body.object_id).toBe("pmdco:Material");
+    expect(posts.at(-1)?.body.object_schema).toBe("pmdco");
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Saved to the crosswalk."));
+  }
+  expect(saved).toHaveLength(3);
+  cleanup();
+  await mount(true);
+  const records = screen.getByRole("list", { name: "saved mappings" });
+  await waitFor(() => expect(within(records).getAllByRole("listitem")).toHaveLength(3));
+  expect(records.textContent).toContain("I reviewed the definitions.");
+  expect(records.textContent).toContain("Reviewed left PMDco anchor");
+  expect(records.textContent).toContain("Reviewed right PMDco anchor");
+});
+
+it("browses the taxonomy and labels imported ancestors as context", async () => {
+  await mount(true);
+  const user = userEvent.setup();
+  const ontology = screen.getByRole("complementary", { name: "PMDco taxonomy" });
+  await user.click(await within(ontology).findByRole("button", { name: "Entity (context)" }));
+  expect(within(ontology).queryByRole("button", { name: "Anchor left selection" })).toBeNull();
+  await user.click(within(ontology).getByRole("button", { name: "Expand Entity" }));
+  await user.click(within(within(ontology).getByRole("tree")).getByRole("button", { name: "Material" }));
+  expect(within(ontology).getByRole("button", { name: "Anchor left selection" }).hasAttribute("disabled")).toBe(true);
+  const detail = within(ontology).getByLabelText("selected ontology term");
+  await user.click(within(detail).getByRole("button", { name: "Entity" }));
+  expect(within(ontology).getByText(/Imported ancestor shown for context/)).toBeDefined();
+  const search = within(ontology).getByLabelText("Search PMDco");
+  await user.type(search, "no-such-term");
+  expect(await within(ontology).findByText("No terms match this search.")).toBeDefined();
+  expect(posts).toHaveLength(0);
 });

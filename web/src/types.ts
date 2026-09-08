@@ -202,3 +202,27 @@ export interface MappingRow {
   subject_snapshot: ElementSnapshot;
   object_snapshot: ElementSnapshot;
 }
+
+export interface TaxonomyTerm {
+  id: string;
+  uri: string;
+  label: string;
+  definition: string | null;
+  synonyms: string[];
+  parents: string[];
+  anchorable: boolean;
+  deprecated: boolean;
+}
+
+export interface PmdcoTaxonomy {
+  schema: string;
+  version: string;
+  version_iri: string;
+  term_count: number;
+  anchor_count: number;
+  terms: TaxonomyTerm[];
+  attribution?: string;
+  license?: string;
+  license_url?: string;
+  release_url?: string;
+}

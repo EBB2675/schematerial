@@ -10,7 +10,7 @@
 
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-import type { ElementDetail, IndexRow, MappingRow, SchemaGraph, SchemaSummary } from "./types";
+import type { ElementDetail, IndexRow, MappingRow, PmdcoTaxonomy, SchemaGraph, SchemaSummary } from "./types";
 
 export interface Catalogue {
   schemas: SchemaSummary[];
@@ -33,6 +33,7 @@ export const api = createApi({
   refetchOnFocus: false,
   refetchOnReconnect: false,
   endpoints: (build) => ({
+    pmdco: build.query<PmdcoTaxonomy, void>({ query: () => "pmdco" }),
     mappings: build.query<{ rows: MappingRow[] }, void>({
       query: () => "mappings",
       providesTags: ["Mappings"],
@@ -71,5 +72,5 @@ export const api = createApi({
 });
 
 export const { useCatalogueQuery, useElementsQuery, useGraphQuery, useElementQuery,
-  useMappingsQuery, useReviewSessionMutation, useHumanWriteMutation } =
+  useMappingsQuery, useReviewSessionMutation, useHumanWriteMutation, usePmdcoQuery } =
   api;

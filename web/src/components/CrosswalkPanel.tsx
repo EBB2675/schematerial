@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { useHumanWriteMutation, useMappingsQuery, useReviewSessionMutation } from "../api";
-import { clearDraft, editDraft, reviewRow, swapDirection, usePair } from "../authoringSlice";
+import { clearDraft, editDraft, reviewRow, setSaving, swapDirection, usePair } from "../authoringSlice";
 import { useAppDispatch, useAppSelector } from "../store";
 
 function failure(error: unknown): string {
@@ -21,7 +21,7 @@ export function CrosswalkPanel() {
   const [write, writeState] = useHumanWriteMutation();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const busy = sessionState.isLoading || writeState.isLoading;
+  const busy = sessionState.isLoading || writeState.isLoading || draft.saving;
   const paired = panes.left.schema && panes.left.selected && panes.right.schema && panes.right.selected;
   const ready = draft.subject && draft.object && draft.author.trim() && draft.comment.trim()
     && draft.confidence !== "" && Number(draft.confidence) >= 0 && Number(draft.confidence) <= 1;
@@ -36,6 +36,7 @@ export function CrosswalkPanel() {
   async function save(action?: "accept" | "reject") {
     if (!ready || busy || !draft.subject || !draft.object) return;
     setError(""); setMessage("");
+    dispatch(setSaving(true));
     try {
       const { token } = await session().unwrap();
       const payload = draft.reviewId ? {
@@ -50,6 +51,7 @@ export function CrosswalkPanel() {
       dispatch(clearDraft());
       setMessage("Saved to the crosswalk.");
     } catch (caught) { setError(failure(caught)); }
+    finally { dispatch(setSaving(false)); }
   }
 
   function submit(event: FormEvent) {
@@ -58,7 +60,7 @@ export function CrosswalkPanel() {
     if (!draft.reviewId) void save();
   }
 
-  return <section className="crosswalk" aria-label="crosswalk authoring and review">
+  return <section id="crosswalk-authoring" className="crosswalk" aria-label="crosswalk authoring and review">
     <div className="crosswalk-heading">
       <h2>Crosswalk</h2>
       <span role="status">{busy ? "Saving…" : draft.dirty ? "Unsaved changes" : message || "No unsaved changes"}</span>
