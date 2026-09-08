@@ -173,6 +173,69 @@ def test_acceptance_guard_catches_writes(code: str) -> None:
 
 
 
+# --- the read-only preview needs no matcher, model or network client ---------
+
+# Nothing in this list exists to be turned off at runtime: the preview must not
+# be able to reach a matcher, an embedding index or the network at all.
+BANNED_IN_WEB = {
+    "schematerial.agents",
+    "schematerial.embeddings",
+    "schematerial.semantics",
+    "anthropic",
+    "openai",
+    "requests",
+    "httpx",
+    "httpx2",
+    "aiohttp",
+    "urllib.request",
+}
+
+
+def module_imports(code: str) -> list[str]:
+    """Every module name a file imports, including the dynamic forms."""
+    found: list[str] = []
+    for node in ast.walk(ast.parse(code)):
+        if isinstance(node, ast.Import):
+            found.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and not node.level:
+            module = node.module or ""
+            found.append(module)
+            found.extend(f"{module}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.Call) and node.args:
+            function = node.func
+            dynamic = (isinstance(function, ast.Name) and function.id == "__import__") or (
+                isinstance(function, ast.Attribute) and function.attr == "import_module"
+            )
+            if dynamic and isinstance(node.args[0], ast.Constant):
+                found.append(str(node.args[0].value))
+    return found
+
+
+def test_web_layer_imports_no_matcher_model_or_network_client() -> None:
+    for path in (REPO / "src" / "schematerial" / "web").rglob("*.py"):
+        for module in module_imports(path.read_text()):
+            offending = [
+                banned
+                for banned in BANNED_IN_WEB
+                if module == banned or module.startswith(f"{banned}.")
+            ]
+            assert offending == [], f"{path}: the preview must not import {module!r}"
+
+
+@pytest.mark.parametrize("code", [
+    "import httpx",
+    "from schematerial.agents import matcher",
+    "from schematerial.embeddings import index",
+    'importlib.import_module("openai")',
+])
+def test_web_import_guard_catches_the_banned_forms(code: str) -> None:
+    assert any(
+        module == banned or module.startswith(f"{banned}.")
+        for module in module_imports(code)
+        for banned in BANNED_IN_WEB
+    )
+
+
 def test_app_cannot_import_extractor_modules() -> None:
     root = REPO / "src" / "schematerial"
     for path in root.rglob("*.py"):
