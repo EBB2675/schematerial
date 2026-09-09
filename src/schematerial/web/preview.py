@@ -321,6 +321,16 @@ def _ancestors(key: str, bases: Mapping[str, Sequence[str]]) -> list[str]:
     return sorted(seen)
 
 
+def _qualified(name: str, version: str | None) -> str:
+    """Two extractions of one module are two schemas, told apart by version.
+
+    This is the address a pane is served under, not an identity: the elements
+    inside keep their own ids. Naming the version is what lets two versions of
+    one module be browsed side by side.
+    """
+    return name if not version else f"{name}@{version}"
+
+
 def build_preview(imported: SchemaImport, *, package: str | None = None) -> SchemaPreview:
     """Turn one converted document into every response the preview can serve.
 
@@ -349,7 +359,7 @@ def build_preview(imported: SchemaImport, *, package: str | None = None) -> Sche
 
     index: list[dict[str, Any]] = []
     details: dict[str, dict[str, Any]] = {}
-    schema_name = str(materialised.name)
+    schema_name = _qualified(str(materialised.name), version)
     # (owner, attribute, target) for locally declared attributes ranging on a
     # class. Collected where each one is declared, so the graph draws structure
     # at the class that wrote it rather than on every subclass inheriting it.
@@ -535,6 +545,7 @@ def unsupported_preview(
     An import the adapter will not vouch for must not be shown as an apparently
     complete pane, and must not silently disappear either.
     """
+    name = _qualified(name, version)
     statuses: dict[str, int] = {}
     for entry in report:
         statuses[entry["status"]] = statuses.get(entry["status"], 0) + 1

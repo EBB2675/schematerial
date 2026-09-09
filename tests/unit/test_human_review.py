@@ -11,25 +11,43 @@ from schematerial.parsers.nomad_json import NomadAdapter
 from schematerial.web.app import create_app
 from schematerial.web.preview import build_preview
 
+# A pane is addressed by module and version, so two versions can load together.
+NOMAD = "nomad@1"
+BAM = "bam@2"
+
+
+def document(source, module, kind, dtype, version, dependencies, contract, annotations):
+    attribute = {"name": "value", "kind": kind,
+                 "range": {"kind": "datatype", "name": dtype},
+                 "annotations": annotations, "shape": []}
+    return {"contract_version": contract, "source": {"name": source, "module": module,
+            "version": version, "dependencies": dependencies}, "report": [], "enums": [],
+            "classes": [{"id": "Sample", "name": "Sample", "bases": [],
+                         **({"annotations": {"entity_kind": "ObjectTypeDef"}}
+                            if kind == "property" else {}),
+                         "attributes": [attribute], "effective_attributes": [
+                             {"name": "value", "kind": kind, "declaring_class_id": "Sample"}]}]}
+
+
+def nomad_at(version):
+    return build_preview(NomadAdapter().convert(document(
+        "nomad-simulations", "nomad", "quantity", "builtins.float", version,
+        {"nomad-lab": "1.4.0"}, "1.1", {})))
+
 
 @pytest.fixture
 def previews():
-    def document(source, module, kind, dtype, version, dependencies, contract, annotations):
-        attribute = {"name": "value", "kind": kind,
-                     "range": {"kind": "datatype", "name": dtype},
-                     "annotations": annotations, "shape": []}
-        return {"contract_version": contract, "source": {"name": source, "module": module,
-                "version": version, "dependencies": dependencies}, "report": [], "enums": [],
-                "classes": [{"id": "Sample", "name": "Sample", "bases": [],
-                             **({"annotations": {"entity_kind": "ObjectTypeDef"}}
-                                if kind == "property" else {}),
-                             "attributes": [attribute], "effective_attributes": [
-                                 {"name": "value", "kind": kind, "declaring_class_id": "Sample"}]}]}
     nomad = document("nomad-simulations", "nomad", "quantity", "builtins.float", "1",
                      {"nomad-lab": "1.4.0"}, "1.1", {})
     bam = document("bam-masterdata", "bam", "property", "REAL", "2",
                    {"pydantic": "2.13.5"}, "1.2", {"property_code": "VALUE", "data_type": "REAL"})
     return [build_preview(NomadAdapter().convert(nomad)), build_preview(BamAdapter().convert(bam))]
+
+
+@pytest.fixture
+def versions():
+    """One module, three extractions: the version-comparison case."""
+    return [nomad_at("1"), nomad_at("3"), nomad_at("5")]
 
 
 def client(previews, path, *, taxonomy=None, **kwargs):
@@ -46,8 +64,8 @@ def headers(live):
 
 
 def form(**changes):
-    return {"subject_schema": "nomad", "subject_id": "nomadsim:Sample.value",
-            "object_schema": "bam", "object_id": "bammd:Sample.value",
+    return {"subject_schema": NOMAD, "subject_id": "nomadsim:Sample.value",
+            "object_schema": BAM, "object_id": "bammd:Sample.value",
             "predicate_id": "skos:narrowMatch", "author_id": "orcid:0000-0001-2345-6789",
             "comment": "Reviewed the two definitions and their scopes.", "confidence": 1, **changes}
 
@@ -58,8 +76,8 @@ def test_manual_create_and_restart(previews, tmp_path, reverse, predicate, monke
     live = client(previews, path)
     payload = form(predicate_id=f"skos:{predicate}Match")
     if reverse:
-        payload.update(subject_schema="bam", subject_id="bammd:Sample.value",
-                       object_schema="nomad", object_id="nomadsim:Sample.value")
+        payload.update(subject_schema=BAM, subject_id="bammd:Sample.value",
+                       object_schema=NOMAD, object_id="nomadsim:Sample.value")
     # Neither request may touch materialisation or matcher code.
     def forbidden(*args, **kwargs):
         raise AssertionError("materialisation entered during a request")
@@ -204,7 +222,7 @@ def test_direct_mapping_and_both_pmdco_anchors_coexist_offline(previews, tmp_pat
     live = client(previews, path, taxonomy=taxonomy)
     assert live.get("/api/pmdco").content == taxonomy.payload_bytes
     drafts = [form(), form(object_schema="pmdco", object_id="pmdco:Material"),
-              form(subject_schema="bam", subject_id="bammd:Sample.value",
+              form(subject_schema=BAM, subject_id="bammd:Sample.value",
                    object_schema="pmdco", object_id="pmdco:Material")]
     created = []
     for draft in drafts:
@@ -274,3 +292,25 @@ def test_human_can_correct_retract_and_restore(previews, tmp_path):
         with pytest.raises(ValueError, match="current suggested"):
             MappingStore(path).reject(item.record_id)
     assert path.read_bytes() == before
+
+
+def test_one_element_maps_across_versions_but_never_to_itself(versions, tmp_path):
+    live = client(versions, tmp_path / "crosswalk.tsv")
+    auth = headers(live)
+    same = form(subject_schema="nomad@1", object_schema="nomad@3",
+                subject_id="nomadsim:Sample.value", object_id="nomadsim:Sample.value",
+                predicate_id="skos:exactMatch")
+    # The ids are identical across versions; the versions are what differ.
+    assert live.post("/api/human/mappings", json=same, headers=auth).status_code == 201
+    assert live.post("/api/human/mappings", json=same, headers=auth).status_code == 409
+    # The same ids read from another pair of versions is a different statement.
+    later = {**same, "object_schema": "nomad@5"}
+    assert live.post("/api/human/mappings", json=later, headers=auth).status_code == 201
+    # Within one version the row would say nothing at all.
+    itself = {**same, "object_schema": "nomad@1"}
+    response = live.post("/api/human/mappings", json=itself, headers=auth)
+    assert response.status_code == 422, response.text
+    assert "itself" in response.json()["detail"]
+    rows = live.get("/api/mappings").json()["rows"]
+    assert [(r["subject_snapshot"]["source_version"], r["object_snapshot"]["source_version"])
+            for r in rows] == [("1", "3"), ("1", "5")]

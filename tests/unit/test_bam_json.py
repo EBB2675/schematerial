@@ -330,7 +330,8 @@ def test_the_converted_schema_loads_in_the_preview_alongside_nomad(tmp_path: Pat
             [ref("Instrument", "name"), ref("Camera", "resolution")], code="CAMERA.INSTRUMENT"),
     )
     previews = ingest([write(bam, "bam.json"), write(nomad_document(), "nomad.json")])
-    assert [preview.name for preview in previews] == ["fixture", "nomad_fixture"]
+    # Each pane is addressed by module and version.
+    assert [preview.name for preview in previews] == ["fixture@0.13.1", "nomad_fixture@0.6.0"]
     assert all(preview.status == "ok" for preview in previews)
     masterdata, nomad = previews
     assert masterdata.summary["source"]["package"] == "bam-masterdata"
