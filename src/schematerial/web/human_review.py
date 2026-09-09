@@ -23,6 +23,17 @@ LOCAL = {"localhost", "127.0.0.1", "::1"}
 TTL = 12 * 60 * 60
 
 
+def _correspondence(row: MappingRow) -> tuple[str | None, ...]:
+    """What makes two rows the same statement.
+
+    An id says which element; the snapshot says which version it was read from.
+    So both belong in the key: mapping one element to itself across 0.6.0 and
+    0.7.0 is a different claim from the same pair across 0.7.0 and 0.8.0.
+    """
+    return (row.subject_id, row.subject_snapshot.source_version, row.predicate_id,
+            row.object_id, row.object_snapshot.source_version)
+
+
 def install_review(
     app: FastAPI, previews: Sequence[SchemaPreview], store: MappingStore, *,
     extra_snapshots: Mapping[tuple[str, str], ElementSnapshot] | None = None,
@@ -111,10 +122,15 @@ def install_review(
         except (ValidationError, TypeError) as error:
             raise HTTPException(422, str(error)) from error
 
+        # Across two versions of one module the ids are identical, and that row
+        # is worth recording. Within one version it would state nothing.
+        if (row.subject_id == row.object_id
+                and row.subject_snapshot.source_version == row.object_snapshot.source_version):
+            raise HTTPException(422, "An element cannot map to itself within one source version")
+
         def create(rows: list[MappingRow]) -> MappingRow:
-            triple = (row.subject_id, row.predicate_id, row.object_id)
-            if any((r.subject_id, r.predicate_id, r.object_id) == triple
-                   for r in current_rows(rows)):
+            statement = _correspondence(row)
+            if any(_correspondence(r) == statement for r in current_rows(rows)):
                 raise HTTPException(
                     409, "Correspondence already exists; reload mappings and inspect the saved row"
                 )
@@ -155,10 +171,8 @@ def install_review(
                     "mapping_justification": "semapv:ManualMappingCuration",
                     "comment": payload["comment"],
                 })
-                if any(r.record_id != row.record_id and
-                       (r.subject_id, r.predicate_id, r.object_id) ==
-                       (result.subject_id, result.predicate_id, result.object_id)
-                       for r in current_rows(rows)):
+                if any(r.record_id != row.record_id and _correspondence(r) ==
+                       _correspondence(result) for r in current_rows(rows)):
                     raise HTTPException(409, "Correspondence already exists")
                 rows.append(result)
                 return result

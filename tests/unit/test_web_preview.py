@@ -29,10 +29,18 @@ from schematerial.parsers.registry import ADAPTERS
 from schematerial.parsers.source import SchemaImportError
 from schematerial.web.app import create_app
 from schematerial.web.graph import COLUMN, MAX_COLUMNS, layer_positions
-from schematerial.web.preview import SchemaPreview, build_preview, ingest
+from schematerial.web.preview import (
+    SchemaPreview,
+    build_preview,
+    ingest,
+    unsupported_preview,
+)
 
 FAKE = Path(__file__).parents[2] / "src/schematerial/extractors/fake.py"
-SCHEMA = "fixture"
+MODULE = "fixture"
+VERSION = "0.6.0"
+# A pane is addressed by module and version, so two versions can load together.
+SCHEMA = f"{MODULE}@{VERSION}"
 
 
 def quantity(name: str = "value", dtype: str = "builtins.float", **kwargs: Any) -> dict[str, Any]:
@@ -57,8 +65,8 @@ def cls(name: str, attrs: list[dict[str, Any]], bases: list[str] | None = None,
 
 
 def document(*classes: dict[str, Any], source_name: str = "nomad-simulations",
-             module: str = SCHEMA) -> dict[str, Any]:
-    return {"contract_version": "1.1", "source": {"name": source_name, "version": "0.6.0",
+             module: str = MODULE, version: str = VERSION) -> dict[str, Any]:
+    return {"contract_version": "1.1", "source": {"name": source_name, "version": version,
             "module": module, "dependencies": {"nomad-lab": "1.4.0"}},
             "classes": list(classes), "enums": [], "report": []}
 
@@ -113,12 +121,35 @@ def detail(client: TestClient, identifier: str) -> dict[str, Any]:
 # --- the page's data reaches the client through the server -------------------
 
 
+def test_two_versions_of_one_module_are_browsable_side_by_side(tmp_path: Path) -> None:
+    # The version-comparison case: one module, two extractions, both addressable.
+    later = document(cls("Base", [quantity("total")]), version="0.7.0")
+    previews = ingest([write(tmp_path, FIXTURE), write(tmp_path, later, "later.json")])
+    assert [preview.name for preview in previews] == [SCHEMA, f"{MODULE}@0.7.0"]
+    client = TestClient(create_app(previews, client_root=Path("/nonexistent")))
+    for preview in previews:
+        served = client.get(f"/api/schemas/{preview.name}").json()
+        assert served["name"] == preview.name
+    # The ids stay version-free, so a rename is an ordinary mapping between them.
+    assert element_id(Source.NOMAD_SIMULATION, ("Base", "total")) in previews[1].details
+
+
+def test_two_schemas_sharing_a_name_are_refused_not_shadowed() -> None:
+    # Two versions of one module ingest under the same name; keeping only the
+    # last would drop the other from every route while still listing it.
+    previews = (unsupported_preview("same", "FIRST"), unsupported_preview("same", "SECOND"))
+    with pytest.raises(ValueError, match="Duplicate schema names: same"):
+        create_app(previews, client_root=Path("/nonexistent"))
+
+
+
+
 def test_catalogue_reports_the_schema_name_and_source(client: TestClient) -> None:
     summaries = client.get("/api/schemas").json()["schemas"]
     assert [row["name"] for row in summaries] == [SCHEMA]
     summary = summaries[0]
     assert summary["status"] == "ok" and summary["error"] is None
-    assert summary["title"] == f"NOMAD {SCHEMA}"
+    assert summary["title"] == f"NOMAD {MODULE}"
     assert summary["source"] == {"package": "nomad-simulations", "version": "0.6.0",
                                  "dependencies": {"nomad-lab": "1.4.0"}}
     assert summary["cache_key"] and summary["toolchain"]["linkml"]
@@ -457,6 +488,7 @@ OTHER = document(
         [ref("Sample", "code"), ref("Powder", "mesh")]),
     source_name="other-masterdata", module="other",
 )
+OTHER_SCHEMA = f"other@{VERSION}"
 
 
 @pytest.fixture
@@ -476,18 +508,18 @@ def test_identifiers_use_the_prefix_the_adapter_wrote(
 ) -> None:
     previews = ingest([write(tmp_path, OTHER, "other.json")])
     client = TestClient(create_app(previews, client_root=Path("/nonexistent")))
-    rows = client.get("/api/schemas/other/elements").json()["elements"]
+    rows = client.get(f"/api/schemas/{OTHER_SCHEMA}/elements").json()["elements"]
     # Every identifier, not just the class ones, carries the other source's prefix.
     assert rows and all(row["id"].startswith("bammd:") for row in rows)
     assert element_id(Source.BAM_MASTERDATA, ("Powder", "code")) in {row["id"] for row in rows}
 
-    inherited = client.get("/api/schemas/other/element", params={
+    inherited = client.get(f"/api/schemas/{OTHER_SCHEMA}/element", params={
         "id": element_id(Source.BAM_MASTERDATA, ("Powder", "code"))}).json()
     assert inherited["inherited"] is True
     assert inherited["declared_in"]["id"] == element_id(Source.BAM_MASTERDATA, ("Sample",))
     assert inherited["declaration_id"] == element_id(Source.BAM_MASTERDATA, ("Sample", "code"))
     assert inherited["snapshot_paths"] == [element_id(Source.BAM_MASTERDATA, ("Powder", "code"))]
-    parents = client.get("/api/schemas/other/element", params={
+    parents = client.get(f"/api/schemas/{OTHER_SCHEMA}/element", params={
         "id": element_id(Source.BAM_MASTERDATA, ("Powder",))}).json()["parents"]
     assert [(parent["key"], parent["role"], parent["id"]) for parent in parents] == [
         ("Sample", "is_a", element_id(Source.BAM_MASTERDATA, ("Sample",)))]
@@ -497,13 +529,13 @@ def test_two_sources_load_together_and_keep_their_own_prefixes(
     tmp_path: Path, other_registered: None
 ) -> None:
     previews = ingest([write(tmp_path, FIXTURE), write(tmp_path, OTHER, "other.json")])
-    assert [preview.name for preview in previews] == [SCHEMA, "other"]
+    assert [preview.name for preview in previews] == [SCHEMA, OTHER_SCHEMA]
     assert all(preview.status == "ok" for preview in previews)
     client = TestClient(create_app(previews, client_root=Path("/nonexistent")))
     assert client.get("/api/health").json()["schemas"] == [
-        {"name": SCHEMA, "status": "ok"}, {"name": "other", "status": "ok"}]
+        {"name": SCHEMA, "status": "ok"}, {"name": OTHER_SCHEMA, "status": "ok"}]
     nomad = client.get(f"/api/schemas/{SCHEMA}/elements").json()["elements"]
-    other = client.get("/api/schemas/other/elements").json()["elements"]
+    other = client.get(f"/api/schemas/{OTHER_SCHEMA}/elements").json()["elements"]
     assert all(row["id"].startswith("nomadsim:") for row in nomad)
     assert all(row["id"].startswith("bammd:") for row in other)
 
