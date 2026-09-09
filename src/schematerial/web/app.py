@@ -6,6 +6,7 @@ materialising schemas or entering the cache.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -58,6 +59,13 @@ def create_app(
 ) -> FastAPI:
     """Build the application over schemas that are already fully prepared."""
     registry = {preview.name: preview for preview in previews}
+    if len(registry) != len(previews):
+        # Two extractions of one module share a name; serving either silently
+        # would hide the other from every route.
+        repeated = sorted(
+            name for name, count in Counter(p.name for p in previews).items() if count > 1
+        )
+        raise ValueError(f"Duplicate schema names: {', '.join(repeated)}")
     catalogue = serialise({"schemas": [preview.summary for preview in previews]})
     health = serialise(
         {

@@ -29,7 +29,12 @@ from schematerial.parsers.registry import ADAPTERS
 from schematerial.parsers.source import SchemaImportError
 from schematerial.web.app import create_app
 from schematerial.web.graph import COLUMN, MAX_COLUMNS, layer_positions
-from schematerial.web.preview import SchemaPreview, build_preview, ingest
+from schematerial.web.preview import (
+    SchemaPreview,
+    build_preview,
+    ingest,
+    unsupported_preview,
+)
 
 FAKE = Path(__file__).parents[2] / "src/schematerial/extractors/fake.py"
 SCHEMA = "fixture"
@@ -111,6 +116,16 @@ def detail(client: TestClient, identifier: str) -> dict[str, Any]:
 
 
 # --- the page's data reaches the client through the server -------------------
+
+
+def test_two_schemas_sharing_a_name_are_refused_not_shadowed() -> None:
+    # Two versions of one module ingest under the same name; keeping only the
+    # last would drop the other from every route while still listing it.
+    previews = (unsupported_preview("same", "FIRST"), unsupported_preview("same", "SECOND"))
+    with pytest.raises(ValueError, match="Duplicate schema names: same"):
+        create_app(previews, client_root=Path("/nonexistent"))
+
+
 
 
 def test_catalogue_reports_the_schema_name_and_source(client: TestClient) -> None:
