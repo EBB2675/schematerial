@@ -41,7 +41,10 @@ export interface SchemaCounts {
 }
 
 export interface SchemaSummary {
+  /** Address of this loaded schema, including its version when known. */
   name: string;
+  /** Source module path, independent of the schema address. */
+  module: string;
   title: string | null;
   status: "ok" | "unsupported";
   error: string | null;

@@ -17,12 +17,16 @@ function stateOf(status: MappingRow["review_status"]): MappingState {
   return status === "accepted" ? "mapped" : status;
 }
 
-/** The state to mark each element with, keyed by element identifier. */
-export function mappingStates(rows: readonly MappingRow[]): Map<string, MappingState> {
+/** States for one source version, keyed by stable element identifier. */
+export function mappingStates(rows: readonly MappingRow[], version: string | null): Map<string, MappingState> {
   const states = new Map<string, MappingState>();
   for (const row of rows) {
     const state = stateOf(row.review_status);
-    for (const id of [row.subject_id, row.object_id]) {
+    for (const [id, snapshot] of [
+      [row.subject_id, row.subject_snapshot],
+      [row.object_id, row.object_snapshot],
+    ] as const) {
+      if (snapshot.source_version !== version) continue;
       const current = states.get(id);
       if (current === undefined || RANK[state] > RANK[current]) states.set(id, state);
     }

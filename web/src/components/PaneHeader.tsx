@@ -1,4 +1,4 @@
-import { moduleLabel, schemaLabel, sourceLabel, versionLabel } from "../format";
+import { schemaLabel } from "../format";
 import { sideLabel, type Side } from "../panes";
 import { useAppDispatch, useAppSelector } from "../store";
 import type { SchemaSummary } from "../types";
@@ -124,17 +124,11 @@ export function PaneHeader({
         <option value="">no schema — close this side</option>
         {schemas.map((schema) => (
           <option key={schema.name} value={schema.name}>
-            {sourceLabel(schema) === "" ? "" : `${sourceLabel(schema)} · `}
-            {moduleLabel(schema)}
+            {schemaLabel(schema)}
             {schema.status === "ok" ? "" : " — unsupported"}
           </option>
         ))}
       </select>
-      {current?.source.version != null && (
-        <span className="pane-version" title={`${versionLabel(current)} · ${current.name}`}>
-          {current.source.version}
-        </span>
-      )}
 
       {browsable && (
         <div className="pane-controls">

@@ -28,6 +28,7 @@ const BAM_CLASS = "bammd:Object%2ESample";
 function summary(name: string, pkg: string, classes: number) {
   return {
     name,
+    module: name,
     title: name,
     status: "ok",
     error: null,

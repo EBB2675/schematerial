@@ -19,30 +19,28 @@ import type { ElementSnapshot, IndexRow, SchemaSummary } from "./types";
  */
 export function sourceLabel(summary: SchemaSummary): string {
   const title = summary.title ?? "";
-  if (title.endsWith(summary.name) && title.length > summary.name.length) {
-    return title.slice(0, title.length - summary.name.length).trim();
+  if (title.endsWith(summary.module) && title.length > summary.module.length) {
+    return title.slice(0, title.length - summary.module.length).trim();
   }
   return summary.source.package ?? "";
 }
 
 /** The last segment of a dotted module path: `…datamodel.object_types` becomes `object_types`. */
 export function moduleLabel(summary: SchemaSummary): string {
-  const parts = summary.name.split(".");
-  return parts[parts.length - 1] ?? summary.name;
+  const parts = summary.module.split(".");
+  return parts[parts.length - 1] ?? summary.module;
 }
 
 /** What a pane header calls its schema. The full module path stays one hover away. */
 export function schemaLabel(summary: SchemaSummary): string {
   const source = sourceLabel(summary);
   const module = moduleLabel(summary);
-  return source === "" ? module : `${source} · ${module}`;
+  return [source, module, summary.source.version].filter((part) => part != null && part !== "").join(" · ");
 }
 
-/** The source package and version, or an empty string when the source stated neither. */
-export function versionLabel(summary: SchemaSummary): string {
-  const { package: name, version } = summary.source;
-  if (name === null) return version ?? "";
-  return version === null ? name : `${name} ${version}`;
+/** An endpoint's version must stay visible even when the source did not state one. */
+export function endpointVersionLabel(version: string | null | undefined): string {
+  return version == null ? "version unknown" : `version ${version}`;
 }
 
 /** Identifiers escape dots inside a segment; a reader wants them back. */

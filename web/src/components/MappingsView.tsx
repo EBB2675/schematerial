@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 
 import { useMappingsQuery } from "../api";
 import { reviewRow } from "../authoringSlice";
-import { idPrefix, predicateLabel, snapshotLabel, statusLabel } from "../format";
+import { endpointVersionLabel, idPrefix, predicateLabel, snapshotLabel, statusLabel } from "../format";
 import { countByStatus } from "../mappings";
 import { useAppDispatch, useAppSelector } from "../store";
 import type { MappingRow } from "../types";
@@ -23,6 +23,8 @@ function matches(row: MappingRow, query: string): boolean {
     row.comment,
     row.subject_snapshot?.name ?? "",
     row.object_snapshot?.name ?? "",
+    row.subject_snapshot?.source_version ?? "",
+    row.object_snapshot?.source_version ?? "",
   ]
     .join(" ")
     .toLowerCase();
@@ -55,6 +57,7 @@ function End({ id, row, which }: { id: string; row: MappingRow; which: "subject"
           label
         )}
       </span>
+      <span className="subtle">{endpointVersionLabel(snapshot?.source_version)}</span>
       <span className="cell-id">
         <span className="chip source">{idPrefix(id)}</span>
         <code title={id}>{id}</code>

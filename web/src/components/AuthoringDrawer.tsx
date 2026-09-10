@@ -1,7 +1,7 @@
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useEffect, useRef, type FormEvent } from "react";
 
-import { useElementsQuery, useHumanWriteMutation, useMappingsQuery, useReviewSessionMutation } from "../api";
+import { useCatalogueQuery, useElementsQuery, useHumanWriteMutation, useMappingsQuery, usePmdcoQuery, useReviewSessionMutation } from "../api";
 import {
   clearDraft,
   editDraft,
@@ -14,8 +14,9 @@ import {
   usePair,
   type MappingEnd,
 } from "../authoringSlice";
-import { PREDICATES, elementLabel, idPrefix, predicateLabel, predicateSense } from "../format";
+import { PREDICATES, elementLabel, endpointVersionLabel, idPrefix, predicateLabel, predicateSense, snapshotLabel } from "../format";
 import { useAppDispatch, useAppSelector } from "../store";
+import type { ElementSnapshot } from "../types";
 import { setAuthoring } from "../uiSlice";
 
 function failure(error: unknown): string {
@@ -27,9 +28,16 @@ function failure(error: unknown): string {
 }
 
 /** A draft endpoint, read back as a name where the index knows one. */
-function End({ end, role }: { end: MappingEnd | null; role: string }) {
-  const { data } = useElementsQuery(end === null || end.schema === "" ? skipToken : end.schema);
+function End({ end, role, snapshot }: { end: MappingEnd | null; role: string; snapshot: ElementSnapshot | undefined }) {
+  const ontology = end?.schema === "pmdco";
+  const { data } = useElementsQuery(end === null || end.schema === "" || ontology ? skipToken : end.schema);
+  const { data: catalogue } = useCatalogueQuery();
+  const { data: taxonomy } = usePmdcoQuery(ontology ? undefined : skipToken);
   const row = end === null ? undefined : data?.elements.find((entry) => entry.id === end.id);
+  const version = snapshot !== undefined
+    ? snapshot.source_version
+    : ontology ? taxonomy?.version
+    : catalogue?.schemas.find((entry) => entry.name === end?.schema)?.source.version;
   return (
     <div className="draft-end">
       <span className="draft-role">{role}</span>
@@ -37,8 +45,9 @@ function End({ end, role }: { end: MappingEnd | null; role: string }) {
         <span className="subtle">not chosen</span>
       ) : (
         <>
-          <span className="draft-name">{row === undefined ? end.id : elementLabel(row)}</span>
+          <span className="draft-name">{snapshot !== undefined ? snapshotLabel(snapshot, end.id) : row === undefined ? end.id : elementLabel(row)}</span>
           <span className="chip source">{idPrefix(end.id)}</span>
+          <span className="chip">{endpointVersionLabel(version)}</span>
           <code className="draft-id">{end.id}</code>
         </>
       )}
@@ -180,13 +189,13 @@ export function AuthoringDrawer() {
             </legend>
 
             <div className="draft-direction" aria-label="mapping direction">
-              <End end={draft.subject} role="subject" />
+              <End end={draft.subject} role="subject" snapshot={row?.subject_snapshot} />
               <div className="draft-predicate">
                 <span aria-hidden="true">↓</span>
                 <strong>{predicateLabel(draft.predicate)}</strong>
                 <span aria-hidden="true">↓</span>
               </div>
-              <End end={draft.object} role="object" />
+              <End end={draft.object} role="object" snapshot={row?.object_snapshot} />
             </div>
             <p className="subtle draft-sense">{predicateSense(draft.predicate)}</p>
 

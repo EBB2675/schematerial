@@ -96,7 +96,7 @@ function Row({
  * neither refilters nor rebuilds the searchable text: the work in a frame is
  * bounded by the viewport, not by how many elements the schema has.
  */
-export function ElementBrowser({ side, schema }: { side: Side; schema: string }) {
+export function ElementBrowser({ side, schema, version }: { side: Side; schema: string; version: string | null }) {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => filtersOf(state.ui, side));
   const linked = useAppSelector((state) => state.ui.panes[side].linked);
@@ -106,7 +106,7 @@ export function ElementBrowser({ side, schema }: { side: Side; schema: string })
 
   const { data, isLoading, isError } = useElementsQuery(schema);
   const { data: mappings } = useMappingsQuery();
-  const states = useMemo(() => mappingStates(mappings?.rows ?? []), [mappings]);
+  const states = useMemo(() => mappingStates(mappings?.rows ?? [], version), [mappings, version]);
   const rows = data?.elements ?? NO_ROWS;
   const haystacks = useMemo(() => buildHaystacks(rows), [rows]);
   const filtered = useMemo(

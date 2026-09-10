@@ -53,6 +53,7 @@ const BAM = "bam_object_types";
 function summary(name: string, pkg: string, count: number): SchemaSummary {
   return {
     name,
+    module: name,
     title: name,
     status: "ok",
     error: null,

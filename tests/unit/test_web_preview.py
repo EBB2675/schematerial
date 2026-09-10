@@ -130,6 +130,8 @@ def test_two_versions_of_one_module_are_browsable_side_by_side(tmp_path: Path) -
     for preview in previews:
         served = client.get(f"/api/schemas/{preview.name}").json()
         assert served["name"] == preview.name
+        assert served["module"] == MODULE
+        assert served["source"]["version"] in (VERSION, "0.7.0")
     # The ids stay version-free, so a rename is an ordinary mapping between them.
     assert element_id(Source.NOMAD_SIMULATION, ("Base", "total")) in previews[1].details
 
@@ -150,6 +152,7 @@ def test_catalogue_reports_the_schema_name_and_source(client: TestClient) -> Non
     summary = summaries[0]
     assert summary["status"] == "ok" and summary["error"] is None
     assert summary["title"] == f"NOMAD {MODULE}"
+    assert summary["module"] == MODULE
     assert summary["source"] == {"package": "nomad-simulations", "version": "0.6.0",
                                  "dependencies": {"nomad-lab": "1.4.0"}}
     assert summary["cache_key"] and summary["toolchain"]["linkml"]

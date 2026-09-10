@@ -518,6 +518,7 @@ def build_preview(imported: SchemaImport, *, package: str | None = None) -> Sche
         statuses[entry["status"]] = statuses.get(entry["status"], 0) + 1
     summary = {
         "name": schema_name,
+        "module": str(materialised.name),
         "title": None if materialised.title is None else str(materialised.title),
         "status": "ok",
         "error": None,
@@ -545,12 +546,14 @@ def unsupported_preview(
     An import the adapter will not vouch for must not be shown as an apparently
     complete pane, and must not silently disappear either.
     """
-    name = _qualified(name, version)
+    module = name
+    name = _qualified(module, version)
     statuses: dict[str, int] = {}
     for entry in report:
         statuses[entry["status"]] = statuses.get(entry["status"], 0) + 1
     summary = {
         "name": name,
+        "module": module,
         "title": None,
         "status": "unsupported",
         "error": error,

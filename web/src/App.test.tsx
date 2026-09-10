@@ -28,6 +28,7 @@ const BAM_ATTRIBUTE = `${BAM_CLASS}.value`;
 
 const SUMMARY = {
   name: SCHEMA,
+  module: SCHEMA,
   title: `NOMAD ${SCHEMA}`,
   status: "ok",
   error: null,
@@ -55,6 +56,7 @@ const SUMMARY = {
 const BAM_SUMMARY = {
   ...SUMMARY,
   name: BAM,
+  module: BAM,
   title: `BAM masterdata ${BAM}`,
   schema_id: "https://w3id.org/schematerial/bam/fixture",
   source: { package: "bam-masterdata", version: "0.13.1", dependencies: {} },
@@ -66,6 +68,7 @@ const BAM_SUMMARY = {
 const REFUSED_SUMMARY = {
   ...SUMMARY,
   name: REFUSED,
+  module: REFUSED,
   title: null,
   status: "unsupported",
   error: "Incomplete NOMAD extraction:\nPkg.Base: unreadable",
@@ -322,8 +325,8 @@ describe("choosing what appears on either side", () => {
   it("opens with one schema from each source, one per side", async () => {
     await bothSides();
     // The header names the source and the module, not the whole dotted path.
-    expect(screen.getByRole("heading", { name: "NOMAD · fixture" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "BAM masterdata · bam_fixture" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "NOMAD · fixture · 0.6.0" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "BAM masterdata · bam_fixture · 0.13.1" })).toBeDefined();
     // Each side keeps the prefix its own adapter wrote.
     expect(options("left")[0]?.textContent).toContain("Base");
     expect(options("right")[0]?.textContent).toContain("Sample");

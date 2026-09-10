@@ -1,4 +1,4 @@
-import { moduleLabel, sourceLabel } from "../format";
+import { schemaLabel } from "../format";
 import type { SchemaSummary } from "../types";
 
 /**
@@ -71,7 +71,7 @@ export function HelpMenu({ schemas }: { schemas: SchemaSummary[] }) {
           {schemas.map((schema) => (
             <li key={schema.name}>
               <span className="loaded-name">
-                {sourceLabel(schema)} · {moduleLabel(schema)}
+                {schemaLabel(schema)}
                 {schema.status === "ok" ? "" : " — unsupported"}
               </span>
               <code>{schema.name}</code>

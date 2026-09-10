@@ -673,13 +673,6 @@ kbd {
   background: var(--surface);
 }
 
-.pane-version {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-
 .pane-controls {
   display: flex;
   align-items: center;

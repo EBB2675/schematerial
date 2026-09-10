@@ -10,13 +10,13 @@ import {
   snapshotLabel,
   sourceLabel,
   statusLabel,
-  versionLabel,
 } from "./format";
 import type { ElementSnapshot, IndexRow, SchemaSummary } from "./types";
 
 function summary(over: Partial<SchemaSummary>): SchemaSummary {
   return {
-    name: "nomad_simulations.schema_packages.model_method",
+    name: "nomad_simulations.schema_packages.model_method@0.6.0",
+    module: "nomad_simulations.schema_packages.model_method",
     title: "NOMAD nomad_simulations.schema_packages.model_method",
     status: "ok",
     error: null,
@@ -45,7 +45,8 @@ describe("naming a schema", () => {
     expect(
       sourceLabel(
         summary({
-          name: "bam_masterdata.datamodel.object_types",
+          name: "bam_masterdata.datamodel.object_types@0.13.1",
+          module: "bam_masterdata.datamodel.object_types",
           title: "BAM masterdata bam_masterdata.datamodel.object_types",
         }),
       ),
@@ -59,17 +60,12 @@ describe("naming a schema", () => {
 
   it("names the module by its last segment, and never loses the whole path", () => {
     expect(moduleLabel(summary({}))).toBe("model_method");
-    expect(schemaLabel(summary({}))).toBe("NOMAD · model_method");
-    // The full dotted path is still the identity; nothing here rewrites it.
-    expect(summary({}).name).toBe("nomad_simulations.schema_packages.model_method");
-  });
-
-  it("reports the source package and version together, or neither", () => {
-    expect(versionLabel(summary({}))).toBe("nomad-simulations 0.6.0");
-    expect(versionLabel(summary({ source: { package: "bam-masterdata", version: null, dependencies: null } }))).toBe(
-      "bam-masterdata",
-    );
-    expect(versionLabel(summary({ source: { package: null, version: null, dependencies: null } }))).toBe("");
+    expect(schemaLabel(summary({}))).toBe("NOMAD · model_method · 0.6.0");
+    expect(summary({}).name).toBe("nomad_simulations.schema_packages.model_method@0.6.0");
+    expect(schemaLabel(summary({
+      name: "nomad_simulations.schema_packages.model_method@0.7.0",
+      source: { package: "nomad-simulations", version: "0.7.0", dependencies: null },
+    }))).toBe("NOMAD · model_method · 0.7.0");
   });
 });
 

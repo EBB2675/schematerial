@@ -1,9 +1,9 @@
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useMemo } from "react";
 
-import { useElementsQuery } from "../api";
+import { useCatalogueQuery, useElementsQuery } from "../api";
 import { usePair } from "../authoringSlice";
-import { elementLabel, idPrefix } from "../format";
+import { elementLabel, endpointVersionLabel, idPrefix } from "../format";
 import { otherSide, sideLabel, type Side } from "../panes";
 import { useAppDispatch, useAppSelector } from "../store";
 import type { IndexRow } from "../types";
@@ -16,6 +16,7 @@ interface Chosen {
   schema: string | null;
   id: string | null;
   row: IndexRow | undefined;
+  version: string | null;
 }
 
 /**
@@ -31,12 +32,14 @@ interface Chosen {
 function useChosen(side: Side): Chosen {
   const pane = useAppSelector((state) => state.ui.panes[side]);
   const { data } = useElementsQuery(pane.schema ?? skipToken);
+  const { data: catalogue } = useCatalogueQuery();
   const rows = data?.elements;
   const row = useMemo(
     () => (pane.selected === null ? undefined : rows?.find((r) => r.id === pane.selected)),
     [rows, pane.selected],
   );
-  return { side, schema: pane.schema, id: pane.selected, row };
+  const version = catalogue?.schemas.find((entry) => entry.name === pane.schema)?.source.version ?? null;
+  return { side, schema: pane.schema, id: pane.selected, row, version };
 }
 
 function End({ chosen, role }: { chosen: Chosen; role: "subject" | "object" }) {
@@ -60,6 +63,7 @@ function End({ chosen, role }: { chosen: Chosen; role: "subject" | "object" }) {
             {chosen.row === undefined ? chosen.id : elementLabel(chosen.row)}
           </span>
           <span className="chip source">{idPrefix(chosen.id)}</span>
+          <span className="chip">{endpointVersionLabel(chosen.version)}</span>
           <code className="strip-id">{chosen.id}</code>
           <Copyable value={chosen.id} label={`the ${sideLabel(chosen.side)} identifier`} />
         </>

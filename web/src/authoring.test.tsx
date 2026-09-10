@@ -28,7 +28,7 @@ const SNAPSHOT = {
   range: "float",
   unit: null,
   semantic_type: null,
-  source_version: "1",
+  source_version: "1.0.0",
 };
 
 let saved: MappingRow[];
@@ -37,15 +37,18 @@ let failSave: boolean;
 let failMappings: boolean;
 let reads: number;
 let confirmed: boolean;
+let catalogue: SchemaSummary[];
 
-function summary(name: string, title: string, pkg: string): SchemaSummary {
+function summary(module: string, title: string, pkg: string, version = "1.0.0"): SchemaSummary {
+  const name = `${module}@${version}`;
   return {
     name,
+    module,
     title,
     status: "ok",
     error: null,
     schema_id: `https://w3id.org/schematerial/${name}`,
-    source: { package: pkg, version: "1.0.0", dependencies: null },
+    source: { package: pkg, version, dependencies: null },
     toolchain: null,
     cache_key: "k",
     counts: {
@@ -88,6 +91,13 @@ function current(): MappingRow[] {
   return saved.filter((row) => !saved.some((later) => later.supersedes === row.record_id));
 }
 
+function snapshotFor(schema: unknown) {
+  if (schema === "pmdco") return { ...SNAPSHOT, source_version: "3.1.0" };
+  const source = catalogue.find((entry) => entry.name === schema);
+  if (source === undefined) throw new Error(`Unknown fixture schema: ${schema}`);
+  return { ...SNAPSHOT, source_version: source.source.version };
+}
+
 beforeEach(() => {
   saved = [];
   posts = [];
@@ -95,6 +105,7 @@ beforeEach(() => {
   failMappings = false;
   reads = 0;
   confirmed = true;
+  catalogue = CATALOGUE;
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -110,7 +121,7 @@ beforeEach(() => {
     vi.fn(async (input: RequestInfo | URL) => {
       const request = input as Request;
       const path = new URL(request.url).pathname;
-      if (path === "/api/schemas") return Response.json({ schemas: CATALOGUE });
+      if (path === "/api/schemas") return Response.json({ schemas: catalogue });
       if (path === "/api/pmdco")
         return Response.json({
           schema: "pmdco",
@@ -150,7 +161,7 @@ beforeEach(() => {
       if (path.includes("/elements")) {
         const nomad = path.includes("nomad");
         return Response.json({
-          schema: nomad ? "nomad" : "bam",
+          schema: decodeURIComponent(path.split("/")[3]!),
           elements: [index(nomad ? NOMAD : BAM)],
         });
       }
@@ -180,8 +191,8 @@ beforeEach(() => {
           review_status: "accepted",
           mapping_date: "2026-09-08",
           mapping_justification: "semapv:ManualMappingCuration",
-          subject_snapshot: SNAPSHOT,
-          object_snapshot: SNAPSHOT,
+          subject_snapshot: snapshotFor(body.subject_schema),
+          object_snapshot: snapshotFor(body.object_schema),
         } as unknown as MappingRow;
         saved.push(row);
         return Response.json(row, { status: 201 });
@@ -304,6 +315,47 @@ it.each([
     expect(leavingSaved.defaultPrevented).toBe(false);
   },
 );
+
+it("distinguishes three versions through selection, creation, badges and review", async () => {
+  catalogue = ["1.0.0", "3.0.0", "5.0.0"].map((version) =>
+    summary("nomad", "NOMAD nomad", "nomad-simulations", version),
+  );
+  await mount();
+  const picker = screen.getByRole("combobox", { name: "schema on the right" });
+  for (const version of ["1.0.0", "3.0.0", "5.0.0"]) {
+    expect(within(picker).getByRole("option", { name: `NOMAD · nomad · ${version}` })).toBeDefined();
+  }
+  const user = await draft();
+  const direction = within(drawer()).getByLabelText("mapping direction");
+  expect(within(direction).getByText("version 1.0.0")).toBeDefined();
+  expect(within(direction).getByText("version 3.0.0")).toBeDefined();
+  await user.click(within(drawer()).getByRole("button", { name: "Reverse direction" }));
+  expect(direction.textContent!.indexOf("version 3.0.0"))
+    .toBeLessThan(direction.textContent!.indexOf("version 1.0.0"));
+  await user.click(within(drawer()).getByRole("button", { name: "Reverse direction" }));
+  await user.click(within(drawer()).getByRole("button", { name: "Save accepted mapping" }));
+  await waitFor(() => expect(saved).toHaveLength(1));
+  expect(posts[0]?.body.subject_schema).toBe("nomad@1.0.0");
+  expect(posts[0]?.body.object_schema).toBe("nomad@3.0.0");
+  expect(posts[0]?.body.subject_id).toBe(posts[0]?.body.object_id);
+  await waitFor(() => expect(screen.getAllByText("mapped")).toHaveLength(2));
+
+  await user.selectOptions(picker, "nomad@5.0.0");
+  const right = screen.getByRole("listbox", { name: /on the right/ });
+  await waitFor(() => expect(within(right).getByRole("option")).toBeDefined());
+  expect(within(right).queryByText("mapped")).toBeNull();
+  const left = screen.getByRole("listbox", { name: /on the left/ });
+  expect(within(left).getByText("mapped")).toBeDefined();
+
+  const table = await mappings(user);
+  expect(within(table).getByText("version 1.0.0")).toBeDefined();
+  expect(within(table).getByText("version 3.0.0")).toBeDefined();
+  await user.click(within(table).getByRole("button", { name: "Correct mapping" }));
+  // Review uses the saved snapshots, even though the pane now shows version 5.
+  expect(within(drawer()).getByText("version 1.0.0")).toBeDefined();
+  expect(within(drawer()).getByText("version 3.0.0")).toBeDefined();
+  expect(within(drawer()).queryByText("version 5.0.0")).toBeNull();
+});
 
 it("offers all five predicates and says what each direction means", async () => {
   await mount();

@@ -105,7 +105,7 @@ export function SchemaPane({ side, schemas }: { side: Side; schemas: SchemaSumma
             {pane.view === "graph" ? (
               <SchemaGraph side={side} schema={current.name} />
             ) : (
-              <ElementBrowser side={side} schema={current.name} />
+              <ElementBrowser side={side} schema={current.name} version={current.source.version} />
             )}
           </div>
           {pane.detail ? (
