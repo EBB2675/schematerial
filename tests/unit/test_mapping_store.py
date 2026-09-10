@@ -1,12 +1,21 @@
 """Real SSSOM parsing, durable identities and automated-write constraints."""
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sssom.parsers import parse_sssom_table
 from sssom_schema import Mapping
 
 from schematerial.identity import ElementSnapshot
-from schematerial.mappings.store import MappingRow, MappingStore, decode, encode
+from schematerial.mappings.store import (
+    MappingConflict,
+    MappingRow,
+    MappingStore,
+    UnknownRecord,
+    current_rows,
+    decode,
+    encode,
+)
 
 
 def row(**changes) -> MappingRow:
@@ -19,6 +28,12 @@ def row(**changes) -> MappingRow:
         "object_snapshot": ElementSnapshot(name="energy", parent="Sample", source_version="2"),
         **changes,
     })
+
+
+def reviewed(store: MappingStore, record_id: str, **changes: Any) -> MappingRow:
+    return store.review(record_id, review_status="rejected",
+                        author_id="https://example.org/reviewer", comment="Not the same quantity.",
+                        mapping_justification="semapv:ManualMappingCuration", **changes)
 
 
 def test_sssom_roundtrip_and_snapshot_authority(tmp_path: Path):
@@ -65,10 +80,74 @@ def test_rejection_is_durable_and_never_resuggested(tmp_path: Path):
     assert rejected.review_status == "rejected"
     reopened = MappingStore(store.path)
     assert reopened.suggest(row()) == rejected
-    assert reopened.rows() == [rejected]
+    assert current_rows(reopened.rows()) == [rejected]
     # Direction is significant, including after rejection.
     reopened.suggest(row(subject_id=suggested.object_id, object_id=suggested.subject_id))
-    assert len(reopened.rows()) == 2
+    assert len(current_rows(reopened.rows())) == 2
+
+
+def test_rejection_appends_and_keeps_the_suggestion(tmp_path: Path):
+    store = MappingStore(tmp_path / "rows.tsv")
+    suggested = store.suggest(row())
+    rejected = store.reject(suggested.record_id)
+    assert rejected.record_id != suggested.record_id
+    assert rejected.supersedes == suggested.record_id
+    # The suggestion survives as history; only the rejection is current.
+    assert MappingStore(store.path).rows() == [suggested, rejected]
+    assert current_rows(store.rows()) == [rejected]
+    with pytest.raises(ValueError, match="current suggested"):
+        store.reject(suggested.record_id)
+
+
+def test_suppression_keys_on_source_versions(tmp_path: Path):
+    store = MappingStore(tmp_path / "rows.tsv")
+    rejected = store.reject(store.suggest(row()).record_id)
+    # The same ids read from a later object version are a different statement.
+    later = row(object_snapshot=ElementSnapshot(name="energy", parent="Sample", source_version="3"))
+    assert store.suggest(later) == later
+    assert store.suggest(row()) == rejected
+    assert current_rows(store.rows()) == [rejected, later]
+
+
+def test_human_rows_and_suggestions_share_one_statement_key(tmp_path: Path):
+    store = MappingStore(tmp_path / "rows.tsv")
+    human = store.add_reviewed(row(review_status="accepted"))
+    assert store.suggest(row()) == human
+    suggested = store.suggest(row(predicate_id="skos:exactMatch"))
+    with pytest.raises(MappingConflict, match="already exists"):
+        store.add_reviewed(row(predicate_id="skos:exactMatch", review_status="accepted"))
+    with pytest.raises(MappingConflict, match="already exists"):
+        store.add_reviewed(row(review_status="accepted"))
+    assert store.rows() == [human, suggested]
+
+
+def test_review_supersedes_only_a_current_row(tmp_path: Path):
+    store = MappingStore(tmp_path / "rows.tsv")
+    first = store.suggest(row())
+    other = store.suggest(row(predicate_id="skos:closeMatch"))
+    # Correcting to a statement that is already current would say it twice.
+    with pytest.raises(MappingConflict, match="already exists"):
+        reviewed(store, first.record_id, predicate_id="skos:closeMatch")
+    decision = reviewed(store, first.record_id)
+    assert decision.supersedes == first.record_id
+    with pytest.raises(MappingConflict, match="already been reviewed"):
+        reviewed(store, first.record_id)
+    with pytest.raises(UnknownRecord):
+        reviewed(store, "urn:uuid:missing")
+    assert store.rows() == [first, other, decision]
+
+
+def test_transactions_cannot_change_an_existing_row(tmp_path: Path):
+    store = MappingStore(tmp_path / "rows.tsv")
+    original = store.suggest(row())
+    before = store.path.read_bytes()
+
+    def overwrite(rows: list[MappingRow]) -> MappingRow:
+        rows[0] = MappingRow.model_validate({**original.model_dump(), "comment": "Rewritten."})
+        return rows[0]
+    with pytest.raises(ValueError, match="append-only"):
+        store._transaction(overwrite)
+    assert store.path.read_bytes() == before
 
 
 @pytest.mark.parametrize("status", ["accepted", "rejected"])
