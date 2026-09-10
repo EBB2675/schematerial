@@ -71,6 +71,35 @@ def test_rejection_is_durable_and_never_resuggested(tmp_path: Path):
     assert len(reopened.rows()) == 2
 
 
+@pytest.mark.parametrize("side", ["subject", "object"])
+@pytest.mark.parametrize("version", ["3", None])
+def test_rejection_only_suppresses_the_same_version_pair(tmp_path: Path, side, version):
+    store = MappingStore(tmp_path / "rows.tsv")
+    original = store.suggest(row())
+    rejected = store.reject(original.record_id)
+    snapshot = getattr(original, f"{side}_snapshot").model_copy(
+        update={"source_version": version})
+    different = row(**{f"{side}_snapshot": snapshot})
+    assert store.suggest(different) == different
+    reopened = MappingStore(store.path)
+    assert reopened.suggest(row()) == rejected
+    assert reopened.suggest(different) == different
+    assert reopened.rows() == [rejected, different]
+
+
+def test_suggestions_compare_current_correspondences_after_correction(tmp_path: Path):
+    original = row()
+    corrected = row(predicate_id="skos:exactMatch", supersedes=original.record_id)
+    path = tmp_path / "rows.tsv"
+    path.write_text(encode([original, corrected], {
+        "mapping_set_id": "urn:uuid:test", "license": "test"}))
+    store = MappingStore(path)
+    assert store.suggest(row(predicate_id="skos:exactMatch")) == corrected
+    new = row()
+    assert store.suggest(new) == new
+    assert store.rows() == [original, corrected, new]
+
+
 @pytest.mark.parametrize("status", ["accepted", "rejected"])
 def test_automated_writer_cannot_set_review_state(tmp_path: Path, status):
     store = MappingStore(tmp_path / "rows.tsv")

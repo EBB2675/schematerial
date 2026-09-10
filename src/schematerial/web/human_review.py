@@ -15,23 +15,18 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from schematerial.identity import ElementSnapshot
-from schematerial.mappings.store import MappingRow, MappingStore, current_rows, reference
+from schematerial.mappings.store import (
+    MappingRow,
+    MappingStore,
+    correspondence_key,
+    current_rows,
+    reference,
+)
 from schematerial.web.preview import SchemaPreview
 
 COOKIE = "schematerial_review"
 LOCAL = {"localhost", "127.0.0.1", "::1"}
 TTL = 12 * 60 * 60
-
-
-def _correspondence(row: MappingRow) -> tuple[str | None, ...]:
-    """What makes two rows the same statement.
-
-    An id says which element; the snapshot says which version it was read from.
-    So both belong in the key: mapping one element to itself across 0.6.0 and
-    0.7.0 is a different claim from the same pair across 0.7.0 and 0.8.0.
-    """
-    return (row.subject_id, row.subject_snapshot.source_version, row.predicate_id,
-            row.object_id, row.object_snapshot.source_version)
 
 
 def install_review(
@@ -129,8 +124,8 @@ def install_review(
             raise HTTPException(422, "An element cannot map to itself within one source version")
 
         def create(rows: list[MappingRow]) -> MappingRow:
-            statement = _correspondence(row)
-            if any(_correspondence(r) == statement for r in current_rows(rows)):
+            statement = correspondence_key(row)
+            if any(correspondence_key(r) == statement for r in current_rows(rows)):
                 raise HTTPException(
                     409, "Correspondence already exists; reload mappings and inspect the saved row"
                 )
@@ -171,8 +166,8 @@ def install_review(
                     "mapping_justification": "semapv:ManualMappingCuration",
                     "comment": payload["comment"],
                 })
-                if any(r.record_id != row.record_id and _correspondence(r) ==
-                       _correspondence(result) for r in current_rows(rows)):
+                if any(r.record_id != row.record_id and correspondence_key(r) ==
+                       correspondence_key(result) for r in current_rows(rows)):
                     raise HTTPException(409, "Correspondence already exists")
                 rows.append(result)
                 return result

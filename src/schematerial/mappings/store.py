@@ -111,6 +111,12 @@ class MappingRow(BaseModel):
         return result
 
 
+def correspondence_key(row: MappingRow) -> tuple[str | None, ...]:
+    """An ordered statement about elements as read from particular versions."""
+    return (row.subject_id, row.subject_snapshot.source_version, row.predicate_id,
+            row.object_id, row.object_snapshot.source_version)
+
+
 def encode(rows: list[MappingRow], metadata: dict) -> str:
     # Preserve unrelated declarations when updating an existing file.
     known = {definition["slot_name"] for definition in EXTENSIONS}
@@ -244,10 +250,9 @@ class MappingStore:
             raise ValueError("automated writes may only suggest")
 
         def add(rows: list[MappingRow]) -> MappingRow:
-            for existing in reversed(rows):
-                if (existing.subject_id, existing.predicate_id, existing.object_id) == (
-                    row.subject_id, row.predicate_id, row.object_id
-                ):
+            statement = correspondence_key(row)
+            for existing in reversed(current_rows(rows)):
+                if correspondence_key(existing) == statement:
                     return existing  # Includes durable rejection suppression.
             rows.append(row)
             return row
