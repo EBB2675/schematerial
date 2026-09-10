@@ -1,7 +1,8 @@
 """Persistent SSSOM/TSV correspondence rows, independent of loaded schemas.
 
-Public automated writes can only suggest or reject. Human acceptance is supplied
-by the web review boundary. All transactions preserve existing rows.
+Automated writes can only suggest or reject. Explicit human decisions go through
+`add_reviewed` and `review`, which only the web review boundary calls. Every
+transaction appends: an existing row never changes and is never removed.
 """
 from __future__ import annotations
 
@@ -39,6 +40,15 @@ EXTENSIONS = [
      "type_hint": "http://www.w3.org/2001/XMLSchema#string"}
     for name in ("review_status", "subject_snapshot", "object_snapshot", "supersedes")
 ]
+DUPLICATE = "Correspondence already exists; reload mappings and inspect the saved row"
+
+
+class MappingConflict(ValueError):
+    """A write that contradicts the current rows. Nothing was written."""
+
+
+class UnknownRecord(LookupError):
+    """A write names a record_id no row carries. Nothing was written."""
 
 
 def reference(value: str) -> str:
@@ -199,9 +209,39 @@ def decode(text: str) -> tuple[list[MappingRow], dict]:
     return rows, metadata
 
 
+def correspondence(row: MappingRow) -> tuple[str | None, ...]:
+    """What makes two rows the same statement.
+
+    An id says which element; the snapshot says which version it was read from.
+    So both belong in the key: mapping one element to itself across 0.6.0 and
+    0.7.0 is a different claim from the same pair across 0.7.0 and 0.8.0.
+    """
+    return (row.subject_id, row.subject_snapshot.source_version, row.predicate_id,
+            row.object_id, row.object_snapshot.source_version)
+
+
 def current_rows(rows: list[MappingRow]) -> list[MappingRow]:
     replaced = {row.supersedes for row in rows if row.supersedes}
     return [row for row in rows if row.record_id not in replaced]
+
+
+def _supersede(rows: list[MappingRow], record_id: str, changes: dict[str, object]) -> MappingRow:
+    """Append a row replacing the current row `record_id`, which stays as history."""
+    target = next((row for row in rows if row.record_id == record_id), None)
+    if target is None:
+        raise UnknownRecord(f"unknown record_id: {record_id}")
+    current = current_rows(rows)
+    if target not in current:
+        raise MappingConflict("This row has already been reviewed; reload mappings")
+    result = MappingRow.model_validate({
+        **target.model_dump(), "mapping_date": date.today(), **changes,
+        "record_id": f"urn:uuid:{uuid4()}", "supersedes": target.record_id,
+    })
+    if any(row.record_id != target.record_id and correspondence(row) == correspondence(result)
+           for row in current):
+        raise MappingConflict(DUPLICATE)
+    rows.append(result)
+    return result
 
 
 class MappingStore:
@@ -221,10 +261,10 @@ class MappingStore:
                 "mapping_set_id": f"urn:uuid:{uuid4()}",
                 "license": "https://w3id.org/sssom/license/unspecified",
             })
-            before = {row.record_id for row in rows}
+            before = list(rows)
             result = change(rows)
-            if not before.issubset({row.record_id for row in rows}):
-                raise ValueError("mapping rows cannot be deleted")
+            if rows[:len(before)] != before:
+                raise ValueError("mapping rows are append-only; an existing row cannot change")
             payload = encode(rows, metadata)
             decode(payload)  # Validate before replacing the durable file.
             descriptor, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".sssom-")
@@ -244,25 +284,51 @@ class MappingStore:
             raise ValueError("automated writes may only suggest")
 
         def add(rows: list[MappingRow]) -> MappingRow:
+            statement = correspondence(row)
             for existing in reversed(rows):
-                if (existing.subject_id, existing.predicate_id, existing.object_id) == (
-                    row.subject_id, row.predicate_id, row.object_id
-                ):
+                if correspondence(existing) == statement:
                     return existing  # Includes durable rejection suppression.
             rows.append(row)
             return row
         return self._transaction(add)
 
     def reject(self, record_id: str) -> MappingRow:
+        """Reject a current suggestion by appending a rejected row that supersedes it."""
         def change(rows: list[MappingRow]) -> MappingRow:
-            for i, row in enumerate(rows):
-                if row.record_id == record_id:
-                    if row.review_status != "suggested" or row not in current_rows(rows):
-                        raise ValueError("only current suggested rows can be rejected")
-                    result = MappingRow.model_validate(
-                        {**row.model_dump(), "review_status": "rejected"}
-                    )
-                    rows[i] = result
-                    return result
-            raise ValueError(f"unknown record_id: {record_id}")
+            target = next((row for row in rows if row.record_id == record_id), None)
+            if target is None:
+                raise UnknownRecord(f"unknown record_id: {record_id}")
+            if target.review_status != "suggested" or target not in current_rows(rows):
+                raise ValueError("only current suggested rows can be rejected")
+            return _supersede(rows, record_id, {"review_status": "rejected"})
         return self._transaction(change)
+
+    def add_reviewed(self, row: MappingRow) -> MappingRow:
+        """Record a row a human created. Only the web review boundary calls this."""
+        if row.supersedes:
+            raise ValueError("a new row cannot supersede; review the existing row instead")
+
+        def add(rows: list[MappingRow]) -> MappingRow:
+            statement = correspondence(row)
+            if any(correspondence(existing) == statement for existing in current_rows(rows)):
+                raise MappingConflict(DUPLICATE)
+            rows.append(row)
+            return row
+        return self._transaction(add)
+
+    def review(
+        self, record_id: str, *, review_status: ReviewStatus, author_id: str, comment: str,
+        mapping_justification: str, predicate_id: Predicate | None = None,
+    ) -> MappingRow:
+        """Record a human decision on a current row by appending a row that supersedes it.
+
+        Only the web review boundary calls this. `predicate_id` corrects the
+        statement; left out, the reviewed row's predicate is kept.
+        """
+        changes: dict[str, object] = {
+            "review_status": review_status, "author_id": author_id, "comment": comment,
+            "mapping_justification": mapping_justification,
+        }
+        if predicate_id is not None:
+            changes["predicate_id"] = predicate_id
+        return self._transaction(lambda rows: _supersede(rows, record_id, changes))

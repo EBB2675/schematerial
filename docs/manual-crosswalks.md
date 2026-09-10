@@ -45,7 +45,7 @@ copy button. Suggested rows have a **Review suggestion** button, accepted rows
 a **Correct mapping** button; either opens the same drawer. Supply a reviewing
 author and rationale, then explicitly **Accept suggestion** or **Reject
 suggestion**. A rejection remains a row and suppresses another suggestion for
-the same ordered subject/predicate/object triple. The original suggestion's
+the same ordered subject/predicate/object triple on the same source versions. The original suggestion's
 author, method, and rationale remain in the comment after review.
 
 List elements are marked mapped, suggested, or rejected. Where several rows
