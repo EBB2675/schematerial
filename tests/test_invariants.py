@@ -284,6 +284,16 @@ def test_app_cannot_import_extractor_modules() -> None:
             )
 
 
+# Store methods that can record a human decision, accepted status included.
+HUMAN_WRITES = {"add_reviewed", "review"}
+
+
+def human_writes(code: str) -> list[str]:
+    return [node.func.attr for node in ast.walk(ast.parse(code))
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr in HUMAN_WRITES]
+
+
 def test_only_web_app_installs_human_review_and_no_tool_uses_private_transactions() -> None:
     root = REPO / "src" / "schematerial"
     for path in root.rglob("*.py"):
@@ -293,3 +303,12 @@ def test_only_web_app_installs_human_review_and_no_tool_uses_private_transaction
             assert "install_review" not in code, str(path)
         if path not in {root / "web" / "human_review.py", root / "mappings" / "store.py"}:
             assert "_transaction" not in code, str(path)
+            assert human_writes(code) == [], f"{path}: only the review boundary records decisions"
+
+
+@pytest.mark.parametrize("code", [
+    "store.add_reviewed(row)",
+    'MappingStore(path).review("urn:uuid:x", review_status=status)',
+])
+def test_human_write_guard_catches_calls(code: str) -> None:
+    assert human_writes(code)

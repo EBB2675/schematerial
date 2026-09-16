@@ -6,32 +6,26 @@ import hmac
 import secrets
 import time
 from collections.abc import Mapping, Sequence
-from datetime import date
 from typing import Any
-from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from schematerial.identity import ElementSnapshot
-from schematerial.mappings.store import MappingRow, MappingStore, current_rows, reference
+from schematerial.mappings.store import (
+    MappingConflict,
+    MappingRow,
+    MappingStore,
+    UnknownRecord,
+    current_rows,
+    reference,
+)
 from schematerial.web.preview import SchemaPreview
 
 COOKIE = "schematerial_review"
 LOCAL = {"localhost", "127.0.0.1", "::1"}
 TTL = 12 * 60 * 60
-
-
-def _correspondence(row: MappingRow) -> tuple[str | None, ...]:
-    """What makes two rows the same statement.
-
-    An id says which element; the snapshot says which version it was read from.
-    So both belong in the key: mapping one element to itself across 0.6.0 and
-    0.7.0 is a different claim from the same pair across 0.7.0 and 0.8.0.
-    """
-    return (row.subject_id, row.subject_snapshot.source_version, row.predicate_id,
-            row.object_id, row.object_snapshot.source_version)
 
 
 def install_review(
@@ -128,16 +122,10 @@ def install_review(
                 and row.subject_snapshot.source_version == row.object_snapshot.source_version):
             raise HTTPException(422, "An element cannot map to itself within one source version")
 
-        def create(rows: list[MappingRow]) -> MappingRow:
-            statement = _correspondence(row)
-            if any(_correspondence(r) == statement for r in current_rows(rows)):
-                raise HTTPException(
-                    409, "Correspondence already exists; reload mappings and inspect the saved row"
-                )
-            rows.append(row)
-            return row
         try:
-            saved = store._transaction(create)
+            saved = store.add_reviewed(row)
+        except MappingConflict as error:
+            raise HTTPException(409, str(error)) from error
         except OSError as error:
             raise HTTPException(503, "Save failed; your draft is still unsaved") from error
         return JSONResponse(saved.model_dump(mode="json"), status_code=201)
@@ -156,29 +144,18 @@ def install_review(
         except (ValueError, TypeError) as error:
             raise HTTPException(422, str(error)) from error
 
-        def review(rows: list[MappingRow]) -> MappingRow:
-            for row in rows:
-                if row.record_id != payload["record_id"]:
-                    continue
-                if row not in current_rows(rows):
-                    raise HTTPException(409, "This row has already been reviewed; reload mappings")
-                result = MappingRow.model_validate({
-                    **row.model_dump(),
-                    "record_id": f"urn:uuid:{uuid4()}", "supersedes": row.record_id,
-                    "predicate_id": payload.get("predicate_id", row.predicate_id),
-                    "review_status": "accepted" if payload["action"] == "accept" else "rejected",
-                    "author_id": payload["author_id"], "mapping_date": date.today(),
-                    "mapping_justification": "semapv:ManualMappingCuration",
-                    "comment": payload["comment"],
-                })
-                if any(r.record_id != row.record_id and _correspondence(r) ==
-                       _correspondence(result) for r in current_rows(rows)):
-                    raise HTTPException(409, "Correspondence already exists")
-                rows.append(result)
-                return result
-            raise HTTPException(404, "Unknown mapping record")
         try:
-            saved = store._transaction(review)
+            saved = store.review(
+                payload["record_id"],
+                review_status="accepted" if payload["action"] == "accept" else "rejected",
+                author_id=payload["author_id"], comment=payload["comment"],
+                mapping_justification="semapv:ManualMappingCuration",
+                predicate_id=payload.get("predicate_id"),
+            )
+        except UnknownRecord as error:
+            raise HTTPException(404, "Unknown mapping record") from error
+        except MappingConflict as error:
+            raise HTTPException(409, str(error)) from error
         except ValidationError as error:
             raise HTTPException(422, str(error)) from error
         except OSError as error:
