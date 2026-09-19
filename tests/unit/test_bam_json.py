@@ -212,6 +212,103 @@ def test_inherited_requiredness_drift_is_refused() -> None:
             BamAdapter().convert(doc)
 
 
+BILINGUAL = "Length of the rod//Länge des Stabes"
+
+
+def described(description: str, **kwargs: Any) -> dict[str, Any]:
+    """One class and one property carrying the same source description."""
+    return {**cls("Instrument", [prop(description=description, **kwargs)]),
+            "description": description}
+
+
+def test_a_bilingual_description_splits_on_class_and_attribute() -> None:
+    doc = boundary(document(
+        described(BILINGUAL), cls("Camera", [], ["Instrument"], [ref("Instrument")]),
+    ))
+    result = BamAdapter().convert(doc)
+    assert result.report == ()
+    schema = safe_load(yaml_dumper.dumps(result.loaded.schema))
+    for element in (schema["classes"]["Instrument"],
+                    schema["classes"]["Instrument"]["attributes"]["alias"],
+                    schema["classes"]["Camera"]["attributes"]["alias"]):
+        assert element["description"] == "Length of the rod"
+        annotations = {tag: item["value"] for tag, item in element["annotations"].items()}
+        assert annotations["description_de"] == "Länge des Stabes"
+        facts = json.loads(annotations["source_annotations"])
+        assert facts["description"] == BILINGUAL
+        # German is never a label, title or alias.
+        assert "Länge" not in json.dumps({key: element.get(key) for key in (
+            "title", "aliases", "structured_aliases")}, ensure_ascii=False)
+
+
+@pytest.mark.parametrize("description", [
+    "Length of the rod", "Documentation: https://example.org/rod",
+])
+def test_a_single_language_description_is_untouched(description: str) -> None:
+    result = BamAdapter().convert(boundary(document(described(description))))
+    assert result.report == ()
+    for element in (class_of(result.schema, "Instrument"), field(result)):
+        assert element.description == description
+        assert "description_de" not in annotations_of(element)
+        facts = json.loads(str(annotations_of(element)["source_annotations"].value))
+        assert facts["description"] == description
+
+
+def test_whitespace_around_each_half_is_stripped() -> None:
+    raw = "  Rod length //  Stablänge: https://example.org/stab "
+    result = BamAdapter().convert(boundary(document(described(raw))))
+    assert field(result).description == "Rod length"
+    assert annotations_of(field(result))["description_de"].value == (
+        "Stablänge: https://example.org/stab")
+    facts = json.loads(str(annotations_of(field(result))["source_annotations"].value))
+    assert facts["description"] == raw
+
+
+@pytest.mark.parametrize("description", [
+    "Resolution////Auflösung", "Axis count//", "//Achsenanzahl", "  //  ",
+    "Group//Gruppe//Gruppe",
+])
+def test_an_unsplittable_bilingual_description_is_untouched_and_reported(
+    description: str,
+) -> None:
+    result = BamAdapter().convert(boundary(document(described(description))))
+    for element in (class_of(result.schema, "Instrument"), field(result)):
+        assert element.description == description
+        assert "description_de" not in annotations_of(element)
+    reason = "bilingual description not split: expected one // between two non-empty halves"
+    assert list(result.report) == [
+        {"path": path, "status": "partial", "reason": reason}
+        for path in ("Instrument", "Instrument.alias")
+    ]
+
+
+def test_the_property_label_never_supplies_a_unit() -> None:
+    result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
+        data_type="REAL", unit="m", annotations={"property_label": "Length in [s]"})]))))
+    attribute = field(result)
+    assert attribute.unit is None and attribute.title is None
+    assert annotations_of(attribute)["source_unit"].value == "m"
+    facts = json.loads(str(annotations_of(attribute)["source_annotations"].value))
+    assert facts["property_label"] == "Length in [s]"
+    assert [row["reason"] for row in result.report] == ["unmapped source unit: m"]
+
+
+def test_inherited_german_description_drift_is_refused() -> None:
+    doc = boundary(document(
+        described(BILINGUAL), cls("Camera", [], ["Instrument"], [ref("Instrument")]),
+    ))
+    original = SchemaView.materialize_derived_schema
+
+    def lose_german(view: SchemaView) -> Any:
+        schema = original(view)
+        del annotations_of(attributes_of(class_of(schema, "Camera"))["alias"])["description_de"]
+        return schema
+
+    with patch.object(SchemaView, "materialize_derived_schema", lose_german):
+        with pytest.raises(BamImportError, match="Camera.alias.*description_de"):
+            BamAdapter().convert(doc)
+
+
 def test_inheritance_is_real_python_inheritance_with_effective_attributes() -> None:
     result = BamAdapter().convert(boundary(document(
         cls("Instrument", [prop("name", code="$NAME")]),
