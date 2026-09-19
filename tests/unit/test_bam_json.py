@@ -7,8 +7,10 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from linkml_runtime.dumpers import yaml_dumper
 from linkml_runtime.linkml_model.meta import PermissibleValue, UnitOfMeasure
 from linkml_runtime.utils.schemaview import SchemaView
+from yaml import safe_load
 
 from schematerial._linkml import annotations_of, attributes_of, class_of, enums_of, slots_of
 from schematerial.cache import MaterialisationCache, content_hash
@@ -158,6 +160,43 @@ def test_entity_metadata_and_object_reference_survive_conversion() -> None:
     assert field(result, name="owner").range == "Person"
     # A class range is a schema path the snapshot walker descends.
     assert "bammd:Instrument.owner.name" in result.loaded.snapshots
+
+
+@pytest.mark.parametrize("mandatory", [True, False, None])
+def test_requiredness_survives_the_boundary_and_inheritance(mandatory: bool | None) -> None:
+    annotations = {} if mandatory is None else {"mandatory": mandatory}
+    doc = boundary(document(
+        cls("Instrument", [prop(annotations=annotations)]),
+        cls("Camera", [], ["Instrument"], [ref("Instrument")]),
+    ))
+    assert doc["classes"][0]["attributes"][0]["annotations"].get("mandatory") is mandatory
+    result = BamAdapter().convert(doc)
+    for source, owners in ((result.to_yaml(), ("Instrument",)),
+                           (yaml_dumper.dumps(result.loaded.schema), ("Instrument", "Camera"))):
+        schema = safe_load(source)
+        for owner in owners:
+            attribute = schema["classes"][owner]["attributes"]["alias"]
+            if mandatory is True:
+                assert attribute["required"] is True
+            else:
+                assert "required" not in attribute
+
+
+def test_inherited_requiredness_drift_is_refused() -> None:
+    doc = boundary(document(
+        cls("Instrument", [prop(annotations={"mandatory": True})]),
+        cls("Camera", [], ["Instrument"], [ref("Instrument")]),
+    ))
+    original = SchemaView.materialize_derived_schema
+
+    def lose_requiredness(view: SchemaView) -> Any:
+        schema = original(view)
+        attributes_of(class_of(schema, "Camera"))["alias"].required = None
+        return schema
+
+    with patch.object(SchemaView, "materialize_derived_schema", lose_requiredness):
+        with pytest.raises(BamImportError, match="Camera.alias.*required"):
+            BamAdapter().convert(doc)
 
 
 def test_inheritance_is_real_python_inheritance_with_effective_attributes() -> None:
