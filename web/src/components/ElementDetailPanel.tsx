@@ -335,6 +335,9 @@ function AttributePanel({
         <Field label="multivalued">
           {detail.multivalued === null ? <Absent what="unset" /> : String(detail.multivalued)}
         </Field>
+        <Field label="required">
+          {detail.required === true ? "true" : <Absent what="unset" />}
+        </Field>
         <Field label="array">
           {detail.array === null ? (
             <Absent what="scalar" />

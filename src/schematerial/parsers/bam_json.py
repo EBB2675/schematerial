@@ -127,6 +127,8 @@ def _attribute(
         name=raw["name"], description=raw.get("description"), range=target,
         slot_uri=element_id(Source.BAM_MASTERDATA, (owner, raw["name"])),
     )
+    if annotations.get("mandatory") is True:
+        attribute.required = True
     set_annotation(attribute, "source_declaring_class", owner)
     set_annotation(attribute, "source_kind", raw["kind"])
     set_annotation(attribute, "source_range", json.dumps(range_, sort_keys=True))
@@ -166,6 +168,7 @@ def _signature(attribute: SlotDefinition) -> dict[str, Any]:
     return {
         "range": value.get("range"), "unit": value.get("unit"),
         "description": value.get("description"),
+        "required": value.get("required"),
         "multivalued": bool(value.get("multivalued")),
         **{tag: annotations.get(tag) for tag in tags},
     }

@@ -426,6 +426,7 @@ def build_preview(imported: SchemaImport, *, package: str | None = None) -> Sche
                 "range": range_,
                 "unit": unit,
                 "multivalued": attribute.multivalued,
+                **({"required": True} if attribute.required is True else {}),
                 "array": _array(attribute),
                 "facets": read_facets(attribute).model_dump(exclude_none=True),
                 "instantiates": [str(item) for item in instantiates_of(attribute)],

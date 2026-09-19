@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 from linkml.generators.pydanticgen import PydanticGenerator
-from linkml_runtime.dumpers import yaml_dumper
+from linkml_runtime.dumpers import json_dumper, yaml_dumper
 from linkml_runtime.linkml_model.meta import ArrayExpression, DimensionExpression, UnitOfMeasure
 from linkml_runtime.utils.schemaview import SchemaView
 
@@ -90,6 +90,28 @@ def test_numeric_symbolic_shapes_and_scalar() -> None:
     assert "smat:NomadShape" in positions.instantiates
     assert any(row["path"] == "Sample.positions" and row["status"] == "partial"
                for row in result.report)
+
+
+def test_nomad_requiredness_is_absent_everywhere() -> None:
+    child = {"name": "child", "kind": "subsection", "repeats": True,
+             "range": {"kind": "class", "name": "Sample"}}
+    result = NomadAdapter().convert(boundary(document(
+        cls("Sample", [quantity(), quantity("array", shape=[3])]),
+        cls("Derived", [child], ["Sample"],
+            [ref("Sample"), ref("Sample", "array"), ref("Derived", "child", "subsection")]),
+    )))
+
+    def check(value: Any) -> None:
+        if isinstance(value, dict):
+            assert "required" not in value
+            for item in value.values():
+                check(item)
+        elif isinstance(value, list):
+            for item in value:
+                check(item)
+
+    for schema in (result.schema, result.loaded.schema):
+        check(json.loads(json_dumper.dumps(schema)))
 
 
 def test_inheritance_nested_subsections_and_initialized_local_override() -> None:

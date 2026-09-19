@@ -108,6 +108,7 @@ export interface AttributeDetail {
   range: RangeInfo | null;
   unit: { ucum_code: string | null; source: string | null } | null;
   multivalued: boolean | null;
+  required?: true;
   array: {
     exact_number_dimensions: number | null;
     dimensions: { alias: string | null; exact_cardinality: number | null }[];
