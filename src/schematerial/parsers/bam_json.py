@@ -1,6 +1,7 @@
 """BAM masterdata extraction JSON to verified canonical LinkML; no source-package imports."""
 
 import json
+import re
 from dataclasses import dataclass
 from graphlib import CycleError, TopologicalSorter
 from importlib.metadata import version
@@ -73,6 +74,11 @@ REFUSED_UNITS = {"rpm", "px", "dpi", "dB"}
 PROPERTY_CODE = "source_property_code"
 ENTITY_CODE = "source_entity_code"
 
+# BAM writes descriptions as `English//Deutsch`. A `//` directly after `:` is a
+# URL scheme, not the language separator.
+LANGUAGE_SEPARATOR = re.compile(r"(?<!:)//")
+GERMAN_DESCRIPTION = "description_de"
+
 
 class BamImportError(SchemaImportError):
     """A BAM masterdata document that cannot be presented as a faithful schema.
@@ -103,6 +109,20 @@ def _canonical_yaml(schema: SchemaDefinition) -> str:
         yaml_dumper.dumps(schema))
 
 
+def _split_description(
+    raw: str | None, path: str, report: list[dict[str, str]],
+) -> tuple[str | None, str | None]:
+    """English and German halves of a bilingual description, or the raw one untouched."""
+    if raw is None or not LANGUAGE_SEPARATOR.search(raw):
+        return raw, None
+    halves = [half.strip() for half in LANGUAGE_SEPARATOR.split(raw)]
+    if len(halves) != 2 or not all(halves):
+        report.append({"path": path, "status": "partial", "reason": (
+            "bilingual description not split: expected one // between two non-empty halves")})
+        return raw, None
+    return halves[0], halves[1]
+
+
 def _permissible(value: str | dict[str, Any]) -> PermissibleValue:
     """One vocabulary term, keeping the label and description the source states."""
     if isinstance(value, str):
@@ -126,11 +146,18 @@ def _attribute(
 
     range_ = raw["range"]
     annotations = raw.get("annotations", {})
+    if "description" in raw:
+        # The raw bilingual string is kept verbatim with the other source facts.
+        annotations = {**annotations, "description": raw["description"]}
+    english, german = _split_description(raw.get("description"), path, report)
     target = TYPE_RANGES.get(range_["name"]) if range_["kind"] == "datatype" else range_["name"]
     attribute = SlotDefinition(
-        name=raw["name"], description=raw.get("description"), range=target,
+        name=raw["name"], description=english, range=target,
         slot_uri=element_id(Source.BAM_MASTERDATA, (owner, raw["name"])),
     )
+    if german is not None:
+        # German is an annotation only, never a title, label or alias.
+        set_annotation(attribute, GERMAN_DESCRIPTION, german)
     if annotations.get("mandatory") is True:
         attribute.required = True
     set_annotation(attribute, "source_declaring_class", owner)
@@ -170,7 +197,8 @@ def _attribute(
 def _signature(attribute: SlotDefinition) -> dict[str, Any]:
     value = json.loads(json_dumper.dumps(attribute))
     tags = ("source_kind", "source_range", "source_type", "source_unit",
-            "source_declaring_class", "source_annotations", PROPERTY_CODE, *FACET_TAGS)
+            "source_declaring_class", "source_annotations", PROPERTY_CODE,
+            GERMAN_DESCRIPTION, *FACET_TAGS)
     annotations = value.get("annotations", {})
     return {
         "range": value.get("range"), "unit": value.get("unit"),
@@ -236,10 +264,15 @@ class BamAdapter:
         }
         for name, row in records.items():
             annotations = row.get("annotations", {})
-            cls = ClassDefinition(name=name, title=row["name"], description=row.get("description"),
+            if "description" in row:
+                annotations = {**annotations, "description": row["description"]}
+            english, german = _split_description(row.get("description"), name, report)
+            cls = ClassDefinition(name=name, title=row["name"], description=english,
                                   class_uri=element_id(Source.BAM_MASTERDATA, (name,)),
                                   is_a=row["bases"][0] if row["bases"] else None,
                                   mixins=row["bases"][1:])
+            if german is not None:
+                set_annotation(cls, GERMAN_DESCRIPTION, german)
             set_annotation(cls, "source_bases", json.dumps(row["bases"]))
             set_annotation(cls, "source_effective_attributes", json.dumps(
                 sorted(row["effective_attributes"], key=lambda r: r["name"]), sort_keys=True))
