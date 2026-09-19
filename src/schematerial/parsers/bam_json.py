@@ -64,6 +64,10 @@ UNIT_CODES = {
     "degree": "deg", "s": "s", "angstrom": "Ao", "kV": "kV", "mA": "mA",
 }
 
+# NOMAD's registry and BAM's stock pint registry disagree on these spellings.
+# Refused until a reviewed unit table records what each one is meant to be.
+REFUSED_UNITS = {"rpm", "px", "dpi", "dB"}
+
 # Source facts kept as their own annotation rather than only inside the source
 # annotation map, because a consumer reads them directly.
 PROPERTY_CODE = "source_property_code"
@@ -147,7 +151,10 @@ def _attribute(
         unit = raw["unit"]
         ucum = UNIT_CODES.get(unit, unit if unit in UNIT_CODES.values() else None)
         set_annotation(attribute, "source_unit", unit)
-        if ucum is None:
+        if unit in REFUSED_UNITS:
+            partial(f"refused source unit: {unit}; the two source registries disagree "
+                    "about this spelling")
+        elif ucum is None:
             partial(f"unmapped source unit: {unit}")
         else:
             attribute.unit = UnitOfMeasure(ucum_code=ucum)
