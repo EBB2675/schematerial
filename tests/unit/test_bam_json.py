@@ -364,7 +364,8 @@ def test_the_converted_schema_loads_in_the_preview_alongside_nomad(tmp_path: Pat
         return path
 
     bam = document(
-        cls("Instrument", [prop("name", code="$NAME")], code="INSTRUMENT"),
+        cls("Instrument", [prop("name", code="$NAME", annotations={"mandatory": True})],
+            code="INSTRUMENT"),
         cls("Camera", [prop("resolution", "INTEGER")], ["Instrument"],
             [ref("Instrument", "name"), ref("Camera", "resolution")], code="CAMERA.INSTRUMENT"),
     )
@@ -383,6 +384,10 @@ def test_the_converted_schema_loads_in_the_preview_alongside_nomad(tmp_path: Pat
     assert inherited["inherited"] is True
     assert inherited["declared_in"]["id"] == element_id("bammd", ("Instrument",))
     assert inherited["source"]["annotations"]["property_code"] == "$NAME"
+    assert inherited["required"] is True
+    assert masterdata.details[element_id("bammd", ("Instrument", "name"))]["required"] is True
+    assert "required" not in masterdata.details[element_id("bammd", ("Camera", "resolution"))]
+    assert all("required" not in detail for detail in nomad.details.values())
 
 
 def test_the_adapter_needs_no_source_package_and_the_runner_names_a_missing_one(

@@ -216,6 +216,7 @@ const DETAILS: Record<string, unknown> = {
     declaration_id: BAM_ATTRIBUTE,
     source_reference: null,
     description: "A masterdata property assignment.",
+    required: true,
     range: { name: "float", kind: "type" },
     unit: null,
     multivalued: null,
@@ -497,6 +498,8 @@ describe("identifiers", () => {
     const right = within(pane("right"));
     await left.findByText("An inherited quantity.");
     await right.findByText("A masterdata property assignment.");
+    expect(left.getByText("required").nextElementSibling?.textContent).toBe("unset");
+    expect(right.getByText("required").nextElementSibling?.textContent).toBe("true");
     // Declaration provenance on the left, still visible while the right is read.
     expect(left.getByText("declared in")).toBeDefined();
     expect(left.getByText(`${BASE_CLASS}.value`)).toBeDefined();
