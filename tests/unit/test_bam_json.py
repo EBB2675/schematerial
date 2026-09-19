@@ -242,7 +242,7 @@ def test_a_bilingual_description_splits_on_class_and_attribute() -> None:
 
 
 @pytest.mark.parametrize("description", [
-    "Length of the rod", "Documentation: https://example.org/rod",
+    "Length of the rod", "Documentation: https://example.org/rod", "Data: file:///tmp/rod",
 ])
 def test_a_single_language_description_is_untouched(description: str) -> None:
     result = BamAdapter().convert(boundary(document(described(description))))

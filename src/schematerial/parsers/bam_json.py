@@ -74,9 +74,9 @@ REFUSED_UNITS = {"rpm", "px", "dpi", "dB"}
 PROPERTY_CODE = "source_property_code"
 ENTITY_CODE = "source_entity_code"
 
-# BAM writes descriptions as `English//Deutsch`. A `//` directly after `:` is a
-# URL scheme, not the language separator.
-LANGUAGE_SEPARATOR = re.compile(r"(?<!:)//")
+# BAM writes descriptions as `English//Deutsch`. A `//` directly after `:`, or
+# the overlapping one inside `:///`, is a URL scheme, not the language separator.
+LANGUAGE_SEPARATOR = re.compile(r"(?<!:)(?<!:/)//")
 GERMAN_DESCRIPTION = "description_de"
 
 
