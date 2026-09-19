@@ -73,6 +73,18 @@ def test_unit_table(raw: str, code: str) -> None:
     assert annotations_of(field(result))["source_unit"].value == raw
 
 
+@pytest.mark.parametrize("raw", ["rpm", "px", "dpi", "dB"])
+def test_divergent_unit_spelling_is_explicitly_refused(raw: str) -> None:
+    result = NomadAdapter().convert(boundary(document(cls("Sample", [quantity(unit=raw)]))))
+    assert field(result).unit is None
+    assert annotations_of(field(result))["source_unit"].value == raw
+    assert list(result.report) == [{
+        "path": "Sample.value", "status": "partial",
+        "reason": f"refused source unit: {raw}; the two source registries disagree "
+                  "about this spelling",
+    }]
+
+
 def test_numeric_symbolic_shapes_and_scalar() -> None:
     result = NomadAdapter().convert(boundary(document(cls("Sample", [
         quantity(), quantity("matrix", shape=[2, 3]), quantity("positions", shape=["n_atoms", 3]),

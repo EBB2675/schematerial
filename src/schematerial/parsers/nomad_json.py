@@ -60,6 +60,10 @@ UNIT_CODES = {
     "mole / liter": "mol/L",
 }
 
+# NOMAD's registry and BAM's stock pint registry disagree on these spellings.
+# Refused until a reviewed unit table records what each one is meant to be.
+REFUSED_UNITS = {"rpm", "px", "dpi", "dB"}
+
 
 class NomadImportError(SchemaImportError):
     """A NOMAD document that cannot be presented as a faithful schema.
@@ -137,7 +141,10 @@ def _attribute(
         unit = raw["unit"]
         code = UNIT_CODES.get(unit, unit if unit in UNIT_CODES.values() else None)
         set_annotation(attribute, "source_unit", unit)
-        if code is None:
+        if unit in REFUSED_UNITS:
+            partial(f"refused source unit: {unit}; the two source registries disagree "
+                    "about this spelling")
+        elif code is None:
             partial(f"unmapped source unit: {unit}")
         else:
             attribute.unit = UnitOfMeasure(ucum_code=code)

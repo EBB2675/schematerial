@@ -99,10 +99,23 @@ def test_unit_table(raw: str, code: str) -> None:
 
 def test_a_unit_with_no_unambiguous_code_is_reported_not_invented() -> None:
     result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
-        data_type="REAL", unit="rpm")]))))
+        data_type="REAL", unit="unfamiliar_unit")]))))
     assert field(result).unit is None
-    assert annotations_of(field(result))["source_unit"].value == "rpm"
-    assert any("unmapped source unit: rpm" in row["reason"] for row in result.report)
+    assert annotations_of(field(result))["source_unit"].value == "unfamiliar_unit"
+    assert any("unmapped source unit: unfamiliar_unit" in row["reason"] for row in result.report)
+
+
+@pytest.mark.parametrize("raw", ["rpm", "px", "dpi", "dB"])
+def test_divergent_unit_spelling_is_explicitly_refused(raw: str) -> None:
+    result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
+        data_type="REAL", unit=raw)]))))
+    assert field(result).unit is None
+    assert annotations_of(field(result))["source_unit"].value == raw
+    assert list(result.report) == [{
+        "path": "Instrument.alias", "status": "partial",
+        "reason": f"refused source unit: {raw}; the two source registries disagree "
+                  "about this spelling",
+    }]
 
 
 def test_one_global_property_on_two_classes_becomes_two_attributes_with_one_code() -> None:
