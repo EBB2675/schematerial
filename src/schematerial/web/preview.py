@@ -422,6 +422,11 @@ def build_preview(imported: SchemaImport, *, package: str | None = None) -> Sche
                 if attribute.slot_uri is None
                 else str(attribute.slot_uri),
                 "source_reference": references.get(name),
+                # The source's own label for the attribute, where it states one.
+                # A source that writes it in two languages keeps the German half
+                # in `title_de`; the code name stays what the browser lists.
+                "title": None if attribute.title is None else str(attribute.title),
+                "title_de": _annotation(attribute, "title_de"),
                 "description": attribute.description,
                 "range": range_,
                 "unit": unit,
