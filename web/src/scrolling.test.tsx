@@ -47,6 +47,10 @@ vi.mock("./search", async (importOriginal) => {
 
 const SMALL = 1_000;
 const LARGE = 100_000;
+// Scroll frames per measured side. Each one is a state update and a re-render
+// of the whole window, a few milliseconds of real work, so a hundred of them
+// average out the noise without making the test cost a minute.
+const SAMPLES = 100;
 const NOMAD = "nomad_general";
 const BAM = "bam_object_types";
 
@@ -223,23 +227,32 @@ describe("what a scroll frame costs", () => {
     for (const list of lists) expect(rendered(list)).toBeLessThan(60);
   });
 
-  it("costs the same per scroll at a hundred times the elements", async () => {
-    const small = await mount(SMALL);
-    burst(small, 40); // warm up
-    const smallCost = burst(small, 200) / 200;
-    cleanup();
+  it(
+    "costs the same per scroll at a hundred times the elements",
+    async () => {
+      const small = await mount(SMALL);
+      burst(small, 25); // warm up
+      const smallCost = burst(small, SAMPLES) / SAMPLES;
+      cleanup();
 
-    const large = await mount(LARGE);
-    burst(large, 40);
-    const largeCost = burst(large, 200) / 200;
+      const large = await mount(LARGE);
+      burst(large, 25);
+      const largeCost = burst(large, SAMPLES) / SAMPLES;
 
-    // Work proportional to the element count would show here as a factor of a
-    // hundred. The bound is deliberately loose so only that fails it.
-    const ratio = largeCost / Math.max(smallCost, 0.0001);
-    expect(ratio, `small ${smallCost.toFixed(4)}ms, large ${largeCost.toFixed(4)}ms`).toBeLessThan(
-      8,
-    );
-  });
+      // Work proportional to the element count would show here as a factor of a
+      // hundred. The bound is deliberately loose so only that fails it.
+      const ratio = largeCost / Math.max(smallCost, 0.0001);
+      expect(ratio, `small ${smallCost.toFixed(4)}ms, large ${largeCost.toFixed(4)}ms`).toBeLessThan(
+        8,
+      );
+    },
+    // Two full mounts and several hundred rendered scroll frames cost seconds
+    // even when everything is fast, and a loaded CI runner crossed the default
+    // five-second timeout. That timeout is a budget for a unit test, not for a
+    // measurement. This one is here to catch a hang; the wall clock is not what
+    // the test is judging, which is exactly why the assertion above is a ratio.
+    30_000,
+  );
 
   it("filters each side once per keystroke, whatever the schema size", async () => {
     const user = userEvent.setup();
