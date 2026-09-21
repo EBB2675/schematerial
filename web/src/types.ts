@@ -104,6 +104,10 @@ export interface AttributeDetail {
   inherited: boolean;
   declaration_id: string | null;
   source_reference: SourceReference | null;
+  /** The source's own label, where it states one. The code name stays `name`. */
+  title: string | null;
+  /** German half of a bilingual label. Not displayed today. */
+  title_de: string | null;
   description: string | null;
   range: RangeInfo | null;
   unit: { ucum_code: string | null; source: string | null } | null;

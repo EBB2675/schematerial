@@ -266,6 +266,52 @@ def test_conversion_facts_survive_into_the_detail(client: TestClient) -> None:
     assert child["range"]["kind"] == "class" and child["range"]["target"]["key"] == "Child"
 
 
+# Only a source that states its own labels produces titles, so this one takes
+# the BAM route. The document is the smallest one that adapter accepts.
+def labelled_property(name: str, label: str | None = None) -> dict[str, Any]:
+    annotations = {"data_type": "VARCHAR", "property_code": name.upper()}
+    if label is not None:
+        annotations["property_label"] = label
+    return {"name": name, "kind": "property", "annotations": annotations,
+            "range": {"kind": "datatype", "name": "VARCHAR"}}
+
+
+LABELLED = {
+    "contract_version": "1.2",
+    "source": {"name": "bam-masterdata", "version": VERSION, "module": "labelled",
+               "dependencies": {"pydantic": "2.13.5"}},
+    "classes": [{
+        "id": "Instrument", "name": "Instrument", "bases": [],
+        "annotations": {"entity_kind": "ObjectTypeDef"},
+        "attributes": [labelled_property("alias", "Alternative name // Alternativname"),
+                       labelled_property("serial")],
+        "effective_attributes": [ref("Instrument", "alias", "property"),
+                                 ref("Instrument", "serial", "property")],
+    }],
+    "enums": [], "report": [],
+}
+
+
+def test_a_source_label_reaches_the_detail_as_a_title(tmp_path: Path) -> None:
+    previews = ingest([write(tmp_path, LABELLED, "labelled.json")])
+    client = TestClient(create_app(previews, client_root=Path("/nonexistent")))
+
+    def labelled_detail(name: str) -> dict[str, Any]:
+        response = client.get(f"/api/schemas/labelled@{VERSION}/element", params={
+            "id": element_id(Source.BAM_MASTERDATA, ("Instrument", name))})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    alias = labelled_detail("alias")
+    assert alias["title"] == "Alternative name" and alias["title_de"] == "Alternativname"
+    # The code name is still what the index lists and what search reads.
+    assert alias["name"] == "alias"
+    rows = client.get(f"/api/schemas/labelled@{VERSION}/elements").json()["elements"]
+    assert {row["name"] for row in rows} == {"Instrument", "alias", "serial"}
+    serial = labelled_detail("serial")
+    assert serial["title"] is None and serial["title_de"] is None
+
+
 # --- nothing happens in a request path ----------------------------------------
 
 

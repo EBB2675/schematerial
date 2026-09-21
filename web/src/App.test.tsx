@@ -180,6 +180,8 @@ const DETAILS: Record<string, unknown> = {
     inherited: true,
     declaration_id: `${BASE_CLASS}.value`,
     source_reference: { kind: "quantity", name: "value", declaring_class_id: "Pkg.Base" },
+    title: null,
+    title_de: null,
     description: "An inherited quantity.",
     range: { name: "float", kind: "type" },
     unit: { ucum_code: "J", source: "joule" },
@@ -215,6 +217,8 @@ const DETAILS: Record<string, unknown> = {
     inherited: false,
     declaration_id: BAM_ATTRIBUTE,
     source_reference: null,
+    title: "Alternative name",
+    title_de: "Alternativname",
     description: "A masterdata property assignment.",
     required: true,
     range: { name: "float", kind: "type" },
@@ -508,6 +512,29 @@ describe("identifiers", () => {
     // Both source parents of the owning class, with their roles.
     expect(await left.findByText("is_a")).toBeDefined();
     expect(left.getByText("mixin")).toBeDefined();
+  });
+
+  it("heads a labelled attribute with its label and keeps the code name", async () => {
+    const user = userEvent.setup();
+    await bothSides();
+    await user.click(options("left")[3] as HTMLElement);
+    await user.click(options("right")[1] as HTMLElement);
+
+    const left = within(pane("left"));
+    const right = within(pane("right"));
+    // The source stated a label, so it reads as the label; the code name is
+    // still on the key line under it.
+    expect(await right.findByRole("heading", { name: "Alternative name" })).toBeDefined();
+    expect(right.getByText("Object.Sample.value")).toBeDefined();
+    // German is carried but not shown.
+    expect(right.queryByText("Alternativname")).toBe(null);
+    // No label: the code name is the heading, as before.
+    expect(await left.findByRole("heading", { name: "value" })).toBeDefined();
+
+    // Listing and search still read the code name, never the label.
+    expect(options("right").some((row) => row.textContent?.includes("value"))).toBe(true);
+    await user.type(screen.getByLabelText("shared search"), "alternative");
+    expect(await right.findByText("Nothing matches this search.")).toBeDefined();
   });
 
   it("reports both selections together without claiming anything about them", async () => {

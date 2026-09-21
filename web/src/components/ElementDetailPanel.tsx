@@ -244,7 +244,9 @@ function AttributePanel({
     <>
       <header className="detail-head">
         <span className="badge kind-attribute">attribute</span>
-        <h3 className="detail-title">{detail.name}</h3>
+        {/* The source's label reads better than the code name, which the line
+            below keeps visible because it is what the index lists. */}
+        <h3 className="detail-title">{detail.title ?? detail.name}</h3>
         <code className="subtle detail-key">
           {readableKey(detail.class.key)}.{detail.name}
         </code>
