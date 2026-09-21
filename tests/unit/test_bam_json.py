@@ -287,11 +287,79 @@ def test_the_property_label_never_supplies_a_unit() -> None:
     result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
         data_type="REAL", unit="m", annotations={"property_label": "Length in [s]"})]))))
     attribute = field(result)
-    assert attribute.unit is None and attribute.title is None
+    # The suffix belongs to the label the source wrote: it is kept in the title
+    # and is still not a unit.
+    assert attribute.unit is None and str(attribute.title) == "Length in [s]"
     assert annotations_of(attribute)["source_unit"].value == "m"
     facts = json.loads(str(annotations_of(attribute)["source_annotations"].value))
     assert facts["property_label"] == "Length in [s]"
     assert [row["reason"] for row in result.report] == ["unmapped source unit: m"]
+
+
+def test_the_property_label_becomes_the_attribute_title() -> None:
+    result = BamAdapter().convert(boundary(document(cls("Instrument", [
+        prop("alias", annotations={"property_label": "Alternative name"}),
+        prop("serial"),
+    ]))))
+    assert str(field(result).title) == "Alternative name"
+    # A property the source gave no label keeps no title at all.
+    assert field(result, name="serial").title is None
+    # The class title stays the short source name; the label never overloads it.
+    assert str(class_of(result.schema, "Instrument").title) == "Instrument"
+    assert result.report == ()
+
+
+def test_a_bilingual_property_label_splits_on_local_and_inherited_attributes() -> None:
+    result = BamAdapter().convert(boundary(document(
+        cls("Instrument", [prop(annotations={
+            "property_label": "Measurement Protocol // Messprotokoll"})]),
+        cls("Camera", [], ["Instrument"], [ref("Instrument")]),
+    )))
+    assert result.report == ()
+    schema = safe_load(yaml_dumper.dumps(result.loaded.schema))
+    for owner in ("Instrument", "Camera"):
+        element = schema["classes"][owner]["attributes"]["alias"]
+        assert element["title"] == "Measurement Protocol"
+        annotations = {tag: item["value"] for tag, item in element["annotations"].items()}
+        assert annotations["title_de"] == "Messprotokoll"
+        # German is never a title or an alias, and the raw label survives verbatim.
+        assert "Messprotokoll" not in json.dumps({key: element.get(key) for key in (
+            "title", "aliases", "structured_aliases")})
+        facts = json.loads(annotations["source_annotations"])
+        assert facts["property_label"] == "Measurement Protocol // Messprotokoll"
+
+
+@pytest.mark.parametrize("label", [
+    "Protocol////Protokoll", "Axis count//", "//Achsenanzahl", "Group//Gruppe//Gruppe",
+])
+def test_an_unsplittable_property_label_is_untouched_and_reported(label: str) -> None:
+    result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
+        annotations={"property_label": label})]))))
+    attribute = field(result)
+    assert str(attribute.title) == label
+    assert "title_de" not in annotations_of(attribute)
+    assert list(result.report) == [{
+        "path": "Instrument.alias", "status": "partial",
+        "reason": "bilingual property label not split: "
+                  "expected one // between two non-empty halves",
+    }]
+
+
+def test_inherited_title_drift_is_refused() -> None:
+    doc = boundary(document(
+        cls("Instrument", [prop(annotations={"property_label": "Alternative name"})]),
+        cls("Camera", [], ["Instrument"], [ref("Instrument")]),
+    ))
+    original = SchemaView.materialize_derived_schema
+
+    def lose_title(view: SchemaView) -> Any:
+        schema = original(view)
+        attributes_of(class_of(schema, "Camera"))["alias"].title = None
+        return schema
+
+    with patch.object(SchemaView, "materialize_derived_schema", lose_title):
+        with pytest.raises(BamImportError, match="Camera.alias.*title"):
+            BamAdapter().convert(doc)
 
 
 def test_inherited_german_description_drift_is_refused() -> None:

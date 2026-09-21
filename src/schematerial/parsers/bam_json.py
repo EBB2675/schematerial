@@ -81,6 +81,7 @@ ENTITY_CODE = "source_entity_code"
 # `Options://Optionen:`, reads as a URL scheme, so it is neither split nor reported.
 LANGUAGE_SEPARATOR = re.compile(r"(?<![:/])/{2,}")
 GERMAN_DESCRIPTION = "description_de"
+GERMAN_TITLE = "title_de"
 
 
 class BamImportError(SchemaImportError):
@@ -112,10 +113,10 @@ def _canonical_yaml(schema: SchemaDefinition) -> str:
         yaml_dumper.dumps(schema))
 
 
-def _split_description(
-    raw: str | None, path: str, report: list[dict[str, str]],
+def _split_bilingual(
+    raw: str | None, path: str, kind: str, report: list[dict[str, str]],
 ) -> tuple[str | None, str | None]:
-    """English and German halves of a bilingual description, or the raw one untouched."""
+    """English and German halves of a bilingual source string, or the raw one untouched."""
     if raw is None:
         return raw, None
     runs = LANGUAGE_SEPARATOR.findall(raw)
@@ -124,7 +125,7 @@ def _split_description(
     halves = [half.strip() for half in LANGUAGE_SEPARATOR.split(raw)]
     if runs != ["//"] or not all(halves):
         report.append({"path": path, "status": "partial", "reason": (
-            "bilingual description not split: expected one // between two non-empty halves")})
+            f"bilingual {kind} not split: expected one // between two non-empty halves")})
         return raw, None
     return halves[0], halves[1]
 
@@ -155,15 +156,22 @@ def _attribute(
     if "description" in raw:
         # The raw bilingual string is kept verbatim with the other source facts.
         annotations = {**annotations, "description": raw["description"]}
-    english, german = _split_description(raw.get("description"), path, report)
+    english, german = _split_bilingual(raw.get("description"), path, "description", report)
+    # The source label is the attribute's title. Its `in [unit]` suffix is part of
+    # the label the source wrote and stays in the title; it is never read as a unit.
+    label = annotations.get("property_label")
+    label_en, label_de = _split_bilingual(
+        label if isinstance(label, str) else None, path, "property label", report)
     target = TYPE_RANGES.get(range_["name"]) if range_["kind"] == "datatype" else range_["name"]
     attribute = SlotDefinition(
-        name=raw["name"], description=english, range=target,
+        name=raw["name"], title=label_en, description=english, range=target,
         slot_uri=element_id(Source.BAM_MASTERDATA, (owner, raw["name"])),
     )
     if german is not None:
         # German is an annotation only, never a title, label or alias.
         set_annotation(attribute, GERMAN_DESCRIPTION, german)
+    if label_de is not None:
+        set_annotation(attribute, GERMAN_TITLE, label_de)
     if annotations.get("mandatory") is True:
         attribute.required = True
     set_annotation(attribute, "source_declaring_class", owner)
@@ -204,10 +212,11 @@ def _signature(attribute: SlotDefinition) -> dict[str, Any]:
     value = json.loads(json_dumper.dumps(attribute))
     tags = ("source_kind", "source_range", "source_type", "source_unit",
             "source_declaring_class", "source_annotations", PROPERTY_CODE,
-            GERMAN_DESCRIPTION, *FACET_TAGS)
+            GERMAN_DESCRIPTION, GERMAN_TITLE, *FACET_TAGS)
     annotations = value.get("annotations", {})
     return {
         "range": value.get("range"), "unit": value.get("unit"),
+        "title": value.get("title"),
         "description": value.get("description"),
         "required": value.get("required"),
         "multivalued": bool(value.get("multivalued")),
@@ -272,7 +281,8 @@ class BamAdapter:
             annotations = row.get("annotations", {})
             if "description" in row:
                 annotations = {**annotations, "description": row["description"]}
-            english, german = _split_description(row.get("description"), name, report)
+            english, german = _split_bilingual(
+                row.get("description"), name, "description", report)
             cls = ClassDefinition(name=name, title=row["name"], description=english,
                                   class_uri=element_id(Source.BAM_MASTERDATA, (name,)),
                                   is_a=row["bases"][0] if row["bases"] else None,
