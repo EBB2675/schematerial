@@ -285,14 +285,14 @@ def test_an_unsplittable_bilingual_description_is_untouched_and_reported(
 
 def test_the_property_label_never_supplies_a_unit() -> None:
     result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
-        data_type="REAL", unit="m", annotations={"property_label": "Length in [s]"})]))))
+        data_type="REAL", unit="m", annotations={"property_label": "Length [s]"})]))))
     attribute = field(result)
     # The suffix belongs to the label the source wrote: it is kept in the title
     # and is still not a unit.
-    assert attribute.unit is None and str(attribute.title) == "Length in [s]"
+    assert attribute.unit is None and str(attribute.title) == "Length [s]"
     assert annotations_of(attribute)["source_unit"].value == "m"
     facts = json.loads(str(annotations_of(attribute)["source_annotations"].value))
-    assert facts["property_label"] == "Length in [s]"
+    assert facts["property_label"] == "Length [s]"
     assert [row["reason"] for row in result.report] == ["unmapped source unit: m"]
 
 
@@ -306,6 +306,33 @@ def test_the_property_label_becomes_the_attribute_title() -> None:
     assert field(result, name="serial").title is None
     # The class title stays the short source name; the label never overloads it.
     assert str(class_of(result.schema, "Instrument").title) == "Instrument"
+    assert result.report == ()
+
+
+@pytest.mark.parametrize("label,title", [
+    ("  Alternative name  ", "Alternative name"),
+    ("Serial  number", "Serial  number"),
+])
+def test_a_property_label_is_stripped_before_it_becomes_a_title(
+    label: str, title: str,
+) -> None:
+    result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
+        annotations={"property_label": label})]))))
+    # Internal spacing is the source's own; only the ends are trimmed.
+    assert str(field(result).title) == title
+    facts = json.loads(str(annotations_of(field(result))["source_annotations"].value))
+    assert facts["property_label"] == label
+    assert result.report == ()
+
+
+@pytest.mark.parametrize("label", ["", "   "])
+def test_a_blank_property_label_is_no_label_at_all(label: str) -> None:
+    result = BamAdapter().convert(boundary(document(cls("Instrument", [prop(
+        annotations={"property_label": label})]))))
+    # Absent, never an empty title.
+    assert field(result).title is None
+    facts = json.loads(str(annotations_of(field(result))["source_annotations"].value))
+    assert facts["property_label"] == label
     assert result.report == ()
 
 

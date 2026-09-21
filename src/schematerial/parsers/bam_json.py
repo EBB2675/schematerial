@@ -157,11 +157,12 @@ def _attribute(
         # The raw bilingual string is kept verbatim with the other source facts.
         annotations = {**annotations, "description": raw["description"]}
     english, german = _split_bilingual(raw.get("description"), path, "description", report)
-    # The source label is the attribute's title. Its `in [unit]` suffix is part of
+    # The source label is the attribute's title. Its `[unit]` suffix is part of
     # the label the source wrote and stays in the title; it is never read as a unit.
+    # A label that is blank once stripped is no label at all, so it gets no title.
     label = annotations.get("property_label")
-    label_en, label_de = _split_bilingual(
-        label if isinstance(label, str) else None, path, "property label", report)
+    label = label.strip() if isinstance(label, str) else None
+    label_en, label_de = _split_bilingual(label or None, path, "property label", report)
     target = TYPE_RANGES.get(range_["name"]) if range_["kind"] == "datatype" else range_["name"]
     attribute = SlotDefinition(
         name=raw["name"], title=label_en, description=english, range=target,
