@@ -243,6 +243,7 @@ def test_a_bilingual_description_splits_on_class_and_attribute() -> None:
 
 @pytest.mark.parametrize("description", [
     "Length of the rod", "Documentation: https://example.org/rod", "Data: file:///tmp/rod",
+    "Share: file:////server/share",
 ])
 def test_a_single_language_description_is_untouched(description: str) -> None:
     result = BamAdapter().convert(boundary(document(described(description))))
@@ -266,7 +267,7 @@ def test_whitespace_around_each_half_is_stripped() -> None:
 
 @pytest.mark.parametrize("description", [
     "Resolution////Auflösung", "Axis count//", "//Achsenanzahl", "  //  ",
-    "Group//Gruppe//Gruppe",
+    "Group//Gruppe//Gruppe", "Glass Silk///Glasseide", "Docs: https://a.org///Doku",
 ])
 def test_an_unsplittable_bilingual_description_is_untouched_and_reported(
     description: str,

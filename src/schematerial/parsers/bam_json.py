@@ -74,9 +74,12 @@ REFUSED_UNITS = {"rpm", "px", "dpi", "dB"}
 PROPERTY_CODE = "source_property_code"
 ENTITY_CODE = "source_entity_code"
 
-# BAM writes descriptions as `English//Deutsch`. A `//` directly after `:`, or
-# the overlapping one inside `:///`, is a URL scheme, not the language separator.
-LANGUAGE_SEPARATOR = re.compile(r"(?<!:)(?<!:/)//")
+# BAM writes descriptions as `English//Deutsch`. The separator is a run of slashes
+# not preceded by `:` or `/`, so a URL scheme keeps its own slashes; a run that is
+# not exactly two slashes, or more than one run, is reported rather than split.
+# Known limit: an English half ending in `:` right before `//`, as in
+# `Options://Optionen:`, reads as a URL scheme, so it is neither split nor reported.
+LANGUAGE_SEPARATOR = re.compile(r"(?<![:/])/{2,}")
 GERMAN_DESCRIPTION = "description_de"
 
 
@@ -113,10 +116,13 @@ def _split_description(
     raw: str | None, path: str, report: list[dict[str, str]],
 ) -> tuple[str | None, str | None]:
     """English and German halves of a bilingual description, or the raw one untouched."""
-    if raw is None or not LANGUAGE_SEPARATOR.search(raw):
+    if raw is None:
+        return raw, None
+    runs = LANGUAGE_SEPARATOR.findall(raw)
+    if not runs:
         return raw, None
     halves = [half.strip() for half in LANGUAGE_SEPARATOR.split(raw)]
-    if len(halves) != 2 or not all(halves):
+    if runs != ["//"] or not all(halves):
         report.append({"path": path, "status": "partial", "reason": (
             "bilingual description not split: expected one // between two non-empty halves")})
         return raw, None
