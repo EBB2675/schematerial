@@ -143,7 +143,7 @@ def test_alias_roots_keep_canonical_definition_ids() -> None:
 def test_dependency_versions_and_effective_references_are_source_evidence() -> None:
     document = validate_document(extract(
         fixture_module(), "v", dependencies={"nomad-lab": "1.4.0"}))
-    assert document["contract_version"] == "1.1"
+    assert document["contract_version"] == "1.2"
     assert document["source"]["dependencies"] == {"nomad-lab": "1.4.0"}
     child = next(c for c in document["classes"] if c["name"] == "Child")
     assert child["effective_attributes"] == [

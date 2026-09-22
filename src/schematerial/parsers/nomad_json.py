@@ -198,9 +198,9 @@ class NomadAdapter:
     def convert(self, document: dict[str, Any]) -> NomadImport:
         document = validate_document(document)
         report = [dict(item) for item in document["report"]]
-        if document["contract_version"] != "1.1":
+        if document["contract_version"] != "1.2":
             raise NomadImportError(
-                "NOMAD import requires contract 1.1; re-extract with evidence", report)
+                "NOMAD import requires contract 1.2; re-extract with evidence", report)
         source = document["source"]
         if source["name"] != "nomad-simulations" or not source["dependencies"].get("nomad-lab"):
             raise NomadImportError("NOMAD import requires nomad-simulations and nomad-lab versions",

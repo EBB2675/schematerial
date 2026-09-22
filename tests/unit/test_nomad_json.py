@@ -41,7 +41,7 @@ def cls(name: str, attrs: list[dict[str, Any]], bases: list[str] | None = None,
 
 
 def document(*classes: dict[str, Any]) -> dict[str, Any]:
-    return {"contract_version": "1.1", "source": {"name": "nomad-simulations", "version": "v1",
+    return {"contract_version": "1.2", "source": {"name": "nomad-simulations", "version": "v1",
             "module": "fixture", "dependencies": {"nomad-lab": "1.4.0"}},
             "classes": list(classes), "enums": [], "report": []}
 
@@ -257,6 +257,13 @@ def test_json_parser_path_and_evidence_requirements(tmp_path: Path) -> None:
         del row["effective_attributes"]
     with pytest.raises(NomadImportError, match="re-extract"):
         NomadAdapter().convert(doc)
+
+
+def test_contract_1_1_requires_reextraction_even_with_valid_evidence() -> None:
+    doc = document(cls("Sample", [quantity()]))
+    doc["contract_version"] = "1.1"
+    with pytest.raises(NomadImportError, match=r"contract 1\.2; re-extract"):
+        NomadAdapter().convert(boundary(doc))
 
 
 @pytest.mark.parametrize("change", ["missing", "owner", "kind", "duplicate", "dependencies"])
