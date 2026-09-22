@@ -8,7 +8,7 @@ from linkml_runtime.linkml_model.meta import PermissibleValue
 from schematerial._linkml import set_annotation
 
 
-def _permissible(value: str | dict[str, Any]) -> PermissibleValue:
+def permissible(value: str | dict[str, Any]) -> PermissibleValue:
     """One vocabulary term, keeping the label and description the source states."""
     if isinstance(value, str):
         return PermissibleValue(text=value)

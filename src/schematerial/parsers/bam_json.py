@@ -29,7 +29,6 @@ from schematerial._linkml import (
 from schematerial.cache import MaterialisationCache
 from schematerial.extraction.contract import (
     CONTRACT_VERSION,
-    enum_value,
     read_document,
     validate_document,
 )
@@ -37,7 +36,7 @@ from schematerial.facets import FACET_TAGS, validate_schema_facets, write_facets
 from schematerial.identity import Source, element_id, snapshot_index
 from schematerial.loading import LoadedSchema
 from schematerial.models.core import MaterialsFacets
-from schematerial.parsers._shared import _permissible
+from schematerial.parsers._shared import permissible
 from schematerial.parsers.source import SchemaImportError
 
 # openBIS data type to LinkML range. Each row is tested. None means the type is
@@ -266,8 +265,8 @@ class BamAdapter:
         schema.enums = {
             row["id"]: EnumDefinition(
                 name=row["id"],
-                permissible_values=[_permissible(value) for value in sorted(
-                    row["values"], key=enum_value)],
+                # Source order carries meaning in the vocabulary, so it is kept as stated.
+                permissible_values=[permissible(value) for value in row["values"]],
             )
             for row in sorted(document["enums"], key=lambda r: r["id"])
         }

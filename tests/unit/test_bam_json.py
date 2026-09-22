@@ -150,7 +150,8 @@ def test_vocabulary_enum_keeps_term_labels_and_descriptions() -> None:
     result = BamAdapter().convert(boundary(doc))
     assert field(result, name="state").range == "Status.terms"
     values = enums_of(result.loaded.schema)["Status.terms"].permissible_values
-    assert isinstance(values, dict) and sorted(values) == ["ACTIVE", "RETIRED"]
+    # The source states the order; it is kept rather than alphabetised.
+    assert isinstance(values, dict) and list(values) == ["RETIRED", "ACTIVE"]
     retired = values["RETIRED"]
     assert isinstance(retired, PermissibleValue)
     assert str(retired.title) == "Retired" and str(retired.description) == "No longer in use"
