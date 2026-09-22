@@ -3,15 +3,29 @@
 import json
 import os
 import venv
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from schematerial.extraction.contract import ContractError, read_document, validate_document
+from schematerial.extraction.contract import (
+    CONTRACT_VERSION,
+    ContractError,
+    read_document,
+    validate_document,
+)
 from schematerial.extraction.runner import ExtractorEnvironment, ExtractorError, run_extractor
 
 FAKE = Path(__file__).parents[2] / "src/schematerial/extractors/fake.py"
+SCHEMA = json.loads(
+    (files("schematerial.extraction") / "contract.schema.json").read_text(encoding="utf-8"))
+
+
+def test_contract_version_matches_the_shipped_schema() -> None:
+    """The constant the adapters check is the version the schema itself declares."""
+    assert CONTRACT_VERSION in SCHEMA["properties"]["contract_version"]["enum"]
+    assert SCHEMA["$id"].endswith(f"/{CONTRACT_VERSION}")
 
 
 @pytest.fixture

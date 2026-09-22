@@ -252,7 +252,7 @@ def test_mixed_enum_values_keep_titles_descriptions_and_annotations() -> None:
     for schema in (result.schema, result.loaded.schema, SchemaView(result.to_yaml()).schema):
         assert schema is not None
         values = enums_of(schema)["State"].permissible_values
-        assert isinstance(values, dict) and list(values) == ["liquid", "solid"]
+        assert isinstance(values, dict) and list(values) == ["solid", "liquid"]
         solid = values["solid"]
         assert isinstance(solid, PermissibleValue)
         assert str(solid.text) == "solid"
@@ -266,8 +266,10 @@ def test_mixed_enum_values_keep_titles_descriptions_and_annotations() -> None:
         assert liquid.title is None
         assert liquid.description is None
         assert not annotations_of(liquid)
+    # The source states the order, so reversing the document reverses the schema.
     doc["enums"][0]["values"].reverse()
-    assert adapter.convert(boundary(doc)).to_yaml() == result.to_yaml()
+    reversed_values = enums_of(adapter.convert(boundary(doc)).schema)["State"].permissible_values
+    assert isinstance(reversed_values, dict) and list(reversed_values) == ["liquid", "solid"]
 
 
 def test_warm_cache_does_no_materialisation_and_ids_survive_input_reordering() -> None:
