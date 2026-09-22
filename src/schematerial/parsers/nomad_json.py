@@ -29,11 +29,17 @@ from schematerial._linkml import (
     set_annotation,
 )
 from schematerial.cache import MaterialisationCache
-from schematerial.extraction.contract import read_document, validate_document
+from schematerial.extraction.contract import (
+    CONTRACT_VERSION,
+    enum_value,
+    read_document,
+    validate_document,
+)
 from schematerial.facets import FACET_TAGS, validate_schema_facets, write_facets
 from schematerial.identity import Source, element_id, snapshot_index
 from schematerial.loading import LoadedSchema
 from schematerial.models.core import MaterialsFacets
+from schematerial.parsers._shared import _permissible
 from schematerial.parsers.source import SchemaImportError
 
 # Each row is tested. None means retained as an explicitly unsupported source type.
@@ -198,9 +204,10 @@ class NomadAdapter:
     def convert(self, document: dict[str, Any]) -> NomadImport:
         document = validate_document(document)
         report = [dict(item) for item in document["report"]]
-        if document["contract_version"] != "1.2":
+        if document["contract_version"] != CONTRACT_VERSION:
             raise NomadImportError(
-                "NOMAD import requires contract 1.2; re-extract with evidence", report)
+                f"NOMAD import requires contract {CONTRACT_VERSION}, "
+                f"found {document['contract_version']}; re-run the current extractor", report)
         source = document["source"]
         if source["name"] != "nomad-simulations" or not source["dependencies"].get("nomad-lab"):
             raise NomadImportError("NOMAD import requires nomad-simulations and nomad-lab versions",
@@ -231,8 +238,14 @@ class NomadAdapter:
         set_annotation(schema, "toolchain_versions", json.dumps(pins, sort_keys=True))
         set_annotation(schema, "source_dependencies",
                        json.dumps(source["dependencies"], sort_keys=True))
-        schema.enums = {row["id"]: EnumDefinition(name=row["id"], permissible_values=row["values"])
-                        for row in sorted(document["enums"], key=lambda r: r["id"])}
+        schema.enums = {
+            row["id"]: EnumDefinition(
+                name=row["id"],
+                permissible_values=[_permissible(value) for value in sorted(
+                    row["values"], key=enum_value)],
+            )
+            for row in sorted(document["enums"], key=lambda r: r["id"])
+        }
         for name, row in records.items():
             cls = ClassDefinition(name=name, title=row["name"], description=row.get("description"),
                                   class_uri=element_id(Source.NOMAD_SIMULATION, (name,)),
@@ -241,6 +254,9 @@ class NomadAdapter:
             set_annotation(cls, "source_bases", json.dumps(row["bases"]))
             set_annotation(cls, "source_effective_attributes", json.dumps(
                 sorted(row["effective_attributes"], key=lambda r: r["name"]), sort_keys=True))
+            annotations = row.get("annotations", {})
+            if annotations:
+                set_annotation(cls, "source_annotations", json.dumps(annotations, sort_keys=True))
             for raw in sorted(row["attributes"], key=lambda a: a["name"]):
                 add_attribute(cls, _attribute(name, raw, report))
             add_class(schema, cls)

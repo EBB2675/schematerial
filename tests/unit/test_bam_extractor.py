@@ -5,7 +5,7 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
-from schematerial.extraction.contract import validate_document
+from schematerial.extraction.contract import CONTRACT_VERSION, validate_document
 
 EXTRACTOR = Path(__file__).parents[2] / "src/schematerial/extractors/bam.py"
 _MODULE = runpy.run_path(str(EXTRACTOR))
@@ -76,7 +76,7 @@ def test_recognition_rule_needs_a_local_defs_holding_a_type_def() -> None:
 
 def test_entity_metadata_properties_and_python_inheritance() -> None:
     document = validate_document(extract(fixture_module(), "0.13.1"))
-    assert document["contract_version"] == "1.2"
+    assert document["contract_version"] == CONTRACT_VERSION
     assert document["source"]["name"] == "bam-masterdata"
     classes = classes_of(document)
     camera = classes["Camera"]

@@ -467,7 +467,7 @@ def test_unresolvable_effective_reference_fails_at_the_contract() -> None:
 
 
 @pytest.mark.parametrize("change,match", [
-    ("version", "requires contract 1.2"),
+    ("version", r"requires contract 1\.2, found 1\.1; re-run the current extractor"),
     ("dependencies", "requires bam-masterdata and pydantic"),
     ("omission", "Incomplete BAM masterdata extraction"),
     ("cycle", "inheritance cycle"),
