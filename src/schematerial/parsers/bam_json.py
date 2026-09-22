@@ -12,7 +12,6 @@ from linkml_runtime.dumpers import json_dumper, yaml_dumper
 from linkml_runtime.linkml_model.meta import (
     ClassDefinition,
     EnumDefinition,
-    PermissibleValue,
     Prefix,
     SchemaDefinition,
     SlotDefinition,
@@ -28,11 +27,16 @@ from schematerial._linkml import (
     set_annotation,
 )
 from schematerial.cache import MaterialisationCache
-from schematerial.extraction.contract import enum_value, read_document, validate_document
+from schematerial.extraction.contract import (
+    CONTRACT_VERSION,
+    read_document,
+    validate_document,
+)
 from schematerial.facets import FACET_TAGS, validate_schema_facets, write_facets
 from schematerial.identity import Source, element_id, snapshot_index
 from schematerial.loading import LoadedSchema
 from schematerial.models.core import MaterialsFacets
+from schematerial.parsers._shared import permissible
 from schematerial.parsers.source import SchemaImportError
 
 # openBIS data type to LinkML range. Each row is tested. None means the type is
@@ -130,19 +134,6 @@ def _split_bilingual(
     return halves[0], halves[1]
 
 
-def _permissible(value: str | dict[str, Any]) -> PermissibleValue:
-    """One vocabulary term, keeping the label and description the source states."""
-    if isinstance(value, str):
-        return PermissibleValue(text=value)
-    permissible = PermissibleValue(
-        text=value["value"], title=value.get("title"), description=value.get("description"),
-    )
-    # JSON text, so a boolean or numeric source fact reads back as what it was.
-    for tag, item in sorted(value.get("annotations", {}).items()):
-        set_annotation(permissible, tag, json.dumps(item))
-    return permissible
-
-
 def _attribute(
     owner: str, raw: dict[str, Any], report: list[dict[str, str]],
 ) -> SlotDefinition:
@@ -237,9 +228,10 @@ class BamAdapter:
     def convert(self, document: dict[str, Any]) -> BamImport:
         document = validate_document(document)
         report = [dict(item) for item in document["report"]]
-        if document["contract_version"] != "1.2":
+        if document["contract_version"] != CONTRACT_VERSION:
             raise BamImportError(
-                "BAM masterdata import requires contract 1.2; re-extract with evidence", report)
+                f"BAM masterdata import requires contract {CONTRACT_VERSION}, "
+                f"found {document['contract_version']}; re-run the current extractor", report)
         source = document["source"]
         if source["name"] != "bam-masterdata" or not source["dependencies"].get("pydantic"):
             raise BamImportError(
@@ -273,8 +265,8 @@ class BamAdapter:
         schema.enums = {
             row["id"]: EnumDefinition(
                 name=row["id"],
-                permissible_values=[_permissible(value) for value in sorted(
-                    row["values"], key=enum_value)],
+                # Source order carries meaning in the vocabulary, so it is kept as stated.
+                permissible_values=[permissible(value) for value in row["values"]],
             )
             for row in sorted(document["enums"], key=lambda r: r["id"])
         }

@@ -32,13 +32,13 @@ def document(source, module, kind, dtype, version, dependencies, contract, annot
 def nomad_at(version):
     return build_preview(NomadAdapter().convert(document(
         "nomad-simulations", "nomad", "quantity", "builtins.float", version,
-        {"nomad-lab": "1.4.0"}, "1.1", {})))
+        {"nomad-lab": "1.4.0"}, "1.2", {})))
 
 
 @pytest.fixture
 def previews():
     nomad = document("nomad-simulations", "nomad", "quantity", "builtins.float", "1",
-                     {"nomad-lab": "1.4.0"}, "1.1", {})
+                     {"nomad-lab": "1.4.0"}, "1.2", {})
     bam = document("bam-masterdata", "bam", "property", "REAL", "2",
                    {"pydantic": "2.13.5"}, "1.2", {"property_code": "VALUE", "data_type": "REAL"})
     return [build_preview(NomadAdapter().convert(nomad)), build_preview(BamAdapter().convert(bam))]

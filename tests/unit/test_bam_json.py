@@ -150,7 +150,8 @@ def test_vocabulary_enum_keeps_term_labels_and_descriptions() -> None:
     result = BamAdapter().convert(boundary(doc))
     assert field(result, name="state").range == "Status.terms"
     values = enums_of(result.loaded.schema)["Status.terms"].permissible_values
-    assert isinstance(values, dict) and sorted(values) == ["ACTIVE", "RETIRED"]
+    # The source states the order; it is kept rather than alphabetised.
+    assert isinstance(values, dict) and list(values) == ["RETIRED", "ACTIVE"]
     retired = values["RETIRED"]
     assert isinstance(retired, PermissibleValue)
     assert str(retired.title) == "Retired" and str(retired.description) == "No longer in use"
@@ -467,7 +468,7 @@ def test_unresolvable_effective_reference_fails_at_the_contract() -> None:
 
 
 @pytest.mark.parametrize("change,match", [
-    ("version", "requires contract 1.2"),
+    ("version", r"requires contract 1\.2, found 1\.1; re-run the current extractor"),
     ("dependencies", "requires bam-masterdata and pydantic"),
     ("omission", "Incomplete BAM masterdata extraction"),
     ("cycle", "inheritance cycle"),
@@ -506,15 +507,9 @@ def test_adapters_are_selected_by_source_and_refuse_each_others_documents() -> N
     # A sibling adapter, not a branch: each refuses a document it did not read.
     from schematerial.parsers.nomad_json import NomadAdapter
 
-    with pytest.raises(NomadImportError):
-        NomadAdapter().convert(doc)
-    # Even at the contract version it does read, the source package still decides.
-    legacy = boundary(document(cls("Instrument", [prop()])))
-    legacy["contract_version"] = "1.1"
-    for row in legacy["classes"]:
-        del row["annotations"]
+    # Both adapters read 1.2; the source package still decides.
     with pytest.raises(NomadImportError, match="nomad-simulations"):
-        NomadAdapter().convert(legacy)
+        NomadAdapter().convert(doc)
 
 
 def test_identifiers_use_the_bam_prefix_throughout() -> None:
@@ -551,7 +546,7 @@ def test_explicit_facets_survive_and_absent_semantics_stay_absent() -> None:
 
 def nomad_document() -> dict[str, Any]:
     """A NOMAD document, so both real adapters can be ingested side by side."""
-    return {"contract_version": "1.1", "source": {
+    return {"contract_version": "1.2", "source": {
         "name": "nomad-simulations", "version": "0.6.0", "module": "nomad_fixture",
         "dependencies": {"nomad-lab": "1.4.0"}}, "enums": [], "report": [], "classes": [{
             "id": "Run", "name": "Run", "bases": [], "attributes": [

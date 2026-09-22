@@ -221,7 +221,7 @@ def extract(
             warn(path, f"incomplete effective definitions: {type(error).__name__}: {error}")
         record["effective_attributes"].sort(key=lambda ref: ref["name"])
     return {
-        "contract_version": "1.1",
+        "contract_version": "1.2",
         "source": {"name": "nomad-simulations", "version": version, "module": module.__name__,
                    "dependencies": dict(sorted((dependencies or {}).items()))},
         "classes": [classes[key] for key in sorted(classes)],

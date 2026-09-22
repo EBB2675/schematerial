@@ -7,6 +7,8 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+CONTRACT_VERSION = "1.2"
+
 _SCHEMA = json.loads(files(__package__).joinpath("contract.schema.json").read_text())
 _VALIDATOR = Draft202012Validator(_SCHEMA)
 

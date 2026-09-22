@@ -9,10 +9,15 @@ from unittest.mock import patch
 import pytest
 from linkml.generators.pydanticgen import PydanticGenerator
 from linkml_runtime.dumpers import json_dumper, yaml_dumper
-from linkml_runtime.linkml_model.meta import ArrayExpression, DimensionExpression, UnitOfMeasure
+from linkml_runtime.linkml_model.meta import (
+    ArrayExpression,
+    DimensionExpression,
+    PermissibleValue,
+    UnitOfMeasure,
+)
 from linkml_runtime.utils.schemaview import SchemaView
 
-from schematerial._linkml import annotations_of, attributes_of, class_of
+from schematerial._linkml import annotations_of, attributes_of, class_of, enums_of
 from schematerial.cache import MaterialisationCache, content_hash
 from schematerial.extraction.contract import ContractError, validate_document
 from schematerial.extraction.runner import ExtractorEnvironment, run_extractor
@@ -41,7 +46,7 @@ def cls(name: str, attrs: list[dict[str, Any]], bases: list[str] | None = None,
 
 
 def document(*classes: dict[str, Any]) -> dict[str, Any]:
-    return {"contract_version": "1.1", "source": {"name": "nomad-simulations", "version": "v1",
+    return {"contract_version": "1.2", "source": {"name": "nomad-simulations", "version": "v1",
             "module": "fixture", "dependencies": {"nomad-lab": "1.4.0"}},
             "classes": list(classes), "enums": [], "report": []}
 
@@ -220,6 +225,53 @@ def test_enum_references_and_same_leaf_class_names_remain_distinct() -> None:
         assert element_id("nomadsim", (name, "value")) in result.loaded.snapshots
 
 
+def test_class_annotations_survive_without_overwriting_provenance() -> None:
+    doc = document(cls("Sample", []), cls("Unannotated", []))
+    annotations = {"label": "Sample label", "deprecated": False, "source_bases": "source fact"}
+    doc["classes"][0]["annotations"] = annotations
+    result = NomadAdapter().convert(boundary(doc))
+    for schema in (result.schema, result.loaded.schema, SchemaView(result.to_yaml()).schema):
+        assert schema is not None
+        stored = annotations_of(class_of(schema, "Sample"))
+        assert json.loads(str(stored["source_annotations"].value)) == annotations
+        assert json.loads(str(stored["source_bases"].value)) == []
+        assert "source_annotations" not in annotations_of(class_of(schema, "Unannotated"))
+
+
+def test_mixed_enum_values_keep_titles_descriptions_and_annotations() -> None:
+    doc = document(cls("Sample", [quantity(range={"kind": "enum", "name": "State"})]))
+    annotations = {"official": True, "rank": 2, "label_de": "Fest"}
+    doc["enums"] = [{"id": "State", "values": [
+        {"value": "solid", "title": "Solid", "description": "Solid phase",
+         "annotations": annotations},
+        "liquid",
+    ]}]
+    adapter = NomadAdapter()
+    result = adapter.convert(boundary(doc))
+    assert field(result).range == "State"
+    for schema in (result.schema, result.loaded.schema, SchemaView(result.to_yaml()).schema):
+        assert schema is not None
+        values = enums_of(schema)["State"].permissible_values
+        assert isinstance(values, dict) and list(values) == ["solid", "liquid"]
+        solid = values["solid"]
+        assert isinstance(solid, PermissibleValue)
+        assert str(solid.text) == "solid"
+        assert str(solid.title) == "Solid"
+        assert str(solid.description) == "Solid phase"
+        assert {tag: json.loads(str(item.value)) for tag, item in
+                annotations_of(solid).items()} == annotations
+        liquid = values["liquid"]
+        assert isinstance(liquid, PermissibleValue)
+        assert str(liquid.text) == "liquid"
+        assert liquid.title is None
+        assert liquid.description is None
+        assert not annotations_of(liquid)
+    # The source states the order, so reversing the document reverses the schema.
+    doc["enums"][0]["values"].reverse()
+    reversed_values = enums_of(adapter.convert(boundary(doc)).schema)["State"].permissible_values
+    assert isinstance(reversed_values, dict) and list(reversed_values) == ["liquid", "solid"]
+
+
 def test_warm_cache_does_no_materialisation_and_ids_survive_input_reordering() -> None:
     adapter = NomadAdapter()
     doc = boundary(document(cls("Sample", [quantity()])))
@@ -255,8 +307,19 @@ def test_json_parser_path_and_evidence_requirements(tmp_path: Path) -> None:
     del doc["source"]["dependencies"]
     for row in doc["classes"]:
         del row["effective_attributes"]
-    with pytest.raises(NomadImportError, match="re-extract"):
+    with pytest.raises(
+        NomadImportError, match=r"contract 1\.2, found 1\.0; re-run the current extractor",
+    ):
         NomadAdapter().convert(doc)
+
+
+def test_contract_1_1_requires_reextraction_even_with_valid_evidence() -> None:
+    doc = document(cls("Sample", [quantity()]))
+    doc["contract_version"] = "1.1"
+    with pytest.raises(
+        NomadImportError, match=r"contract 1\.2, found 1\.1; re-run the current extractor",
+    ):
+        NomadAdapter().convert(boundary(doc))
 
 
 @pytest.mark.parametrize("change", ["missing", "owner", "kind", "duplicate", "dependencies"])

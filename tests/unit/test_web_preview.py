@@ -66,7 +66,7 @@ def cls(name: str, attrs: list[dict[str, Any]], bases: list[str] | None = None,
 
 def document(*classes: dict[str, Any], source_name: str = "nomad-simulations",
              module: str = MODULE, version: str = VERSION) -> dict[str, Any]:
-    return {"contract_version": "1.1", "source": {"name": source_name, "version": version,
+    return {"contract_version": "1.2", "source": {"name": source_name, "version": version,
             "module": module, "dependencies": {"nomad-lab": "1.4.0"}},
             "classes": list(classes), "enums": [], "report": []}
 
@@ -384,7 +384,7 @@ def test_a_refused_document_is_listed_with_its_reason(tmp_path: Path) -> None:
     client = TestClient(create_app(previews, client_root=Path("/nonexistent")))
     summary = client.get("/api/schemas").json()["schemas"][0]
     assert summary["status"] == "unsupported"
-    assert "contract 1.1" in summary["error"]
+    assert "contract 1.2" in summary["error"]
     assert summary["counts"]["browsable_elements"] == 0
     assert client.get(f"/api/schemas/{SCHEMA}/elements").json()["elements"] == []
 
